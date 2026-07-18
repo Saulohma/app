@@ -348,11 +348,11 @@ with tab1:
         if not df_lav.empty:
             exibir = df_lav[['data','cliente','tipo_veiculo','servico','valor','placa','quantidade']].head(10)
             exibir['data'] = exibir['data'].dt.strftime('%d/%m/%Y')
-            exibir['valor'] = pd.to_numeric(exibir['valor'], errors='coerce')
+            total_valor = pd.to_numeric(df_lav['valor'], errors='coerce').sum()
             exibir['valor'] = exibir['valor'].apply(lambda v: f"R$ {v:,.2f}".replace(",","X").replace(".",",").replace("X","."))
             exibir.columns = ['Data','Cliente','Tipo','Serviço','Valor','Placa','Qtd']
             st.dataframe(exibir, use_container_width=True, hide_index=True)
-            total_valor = float(df_lav['valor'].sum())
+            total_valor = pd.to_numeric(df_lav['valor'], errors='coerce').sum()
             st.markdown(f"**Total:** {len(df_lav)} lavagens | **Valor total:** R$ {float(total_valor):,.2f}".replace(",","X").replace(".",",").replace("X","."))
         else:
             st.info("Nenhuma lavagem registrada ainda.")
