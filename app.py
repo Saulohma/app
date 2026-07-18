@@ -133,10 +133,19 @@ def migrar_excel():
     if list(cursor.fetchone().values())[0] > 0:
         conn.close()
         return
+
+    # --- LAVAGENS ---
     xlsx = Path(__file__).parent / "dados.xlsx"
     if xlsx.exists():
         try:
             df = pd.read_excel(str(xlsx))
+            # Remove linha que contém cabeçalhos repetidos como dados
+            if not df.empty:
+                first_row = df.iloc[0].astype(str).str.lower().tolist()
+                expected = ['data', 'tipo', 'serviço', 'servico', 'valor', 'cliente', 'placa', 'quantidade']
+                if any(f in first_row for f in expected):
+                    df = df.iloc[1:].reset_index(drop=True)
+
             for _, r in df.iterrows():
                 d = r.get('data') or r.get('Data') or ''
                 if isinstance(d, (datetime, pd.Timestamp)): d = d.strftime('%Y-%m-%d')
@@ -152,20 +161,29 @@ def migrar_excel():
                 q = int(r.get('quantidade') or r.get('Quantidade') or 1)
                 cursor.execute("""INSERT INTO lavagens (data,tipo_veiculo,servico,valor,cliente,placa,quantidade) VALUES (%s,%s,%s,%s,%s,%s,%s)""", (d,t,s,v,c,p,q))
             conn.commit()
-        except:
-            pass
+        except Exception as e:
+            print(f"Erro migração lavagens: {e}")
+
+    # --- MENSALISTAS ---
     xlsxm = Path(__file__).parent / "mensalistas.xlsx"
     if xlsxm.exists():
         try:
             df = pd.read_excel(str(xlsxm))
+            # Remove linha que contém cabeçalhos repetidos
+            if not df.empty:
+                first_row = df.iloc[0].astype(str).str.lower().tolist()
+                expected = ['nome', 'telefone', 'tipo', 'placa', 'plano', 'valor', 'data', 'ativo']
+                if any(f in first_row for f in expected):
+                    df = df.iloc[1:].reset_index(drop=True)
+
             for _, r in df.iterrows():
                 n = str(r.get('nome') or r.get('Nome') or '').strip().upper()
                 t = str(r.get('telefone') or r.get('Telefone') or '')
                 tp = str(r.get('tipo') or r.get('Tipo') or 'Comum')
                 p = str(r.get('placa') or r.get('Placa') or '').upper()
                 pl = str(r.get('plano') or r.get('Plano') or 'Valor Fixo Mensal')
-                v = float(r.get('valor_plano') or r.get('Valor Plano') or 0)
-                di = r.get('data_inicio') or r.get('Data Início') or ''
+                v = float(r.get('valor_plano') or r.get('Valor Plano') or r.get('valor') or 0)
+                di = r.get('data_inicio') or r.get('Data Início') or r.get('data') or ''
                 if isinstance(di, (datetime, pd.Timestamp)): di = di.strftime('%Y-%m-%d')
                 elif isinstance(di, str):
                     try: di = datetime.strptime(di.strip(), '%d/%m/%Y').strftime('%Y-%m-%d')
@@ -174,12 +192,15 @@ def migrar_excel():
                 a = int(r.get('ativo') or r.get('Ativo') or 0)
                 cursor.execute("""INSERT INTO mensalistas (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""", (n,t,tp,p,pl,v,di,a))
             conn.commit()
-        except:
-            pass
+        except Exception as e:
+            print(f"Erro migração mensalistas: {e}")
+
     conn.close()
+
 
 init_db()
 migrar_excel()
+limpar_dados_corrompidos() 
 
 # ============================================================
 # FUNÇÕES
@@ -643,8 +664,9 @@ with tab3:
                         if st.button("✅ CONFIRMAR RESET", type="primary", use_container_width=True):
                             try:
                                 conn = get_conn()
-                                conn.execute("DELETE FROM lavagens")
-                                conn.execute("DELETE FROM mensalistas")
+                                with conn.cursor() as cur:
+                                    cur.execute("DELETE FROM lavagens")
+                                    cur.execute("DELETE FROM mensalistas")
                                 conn.commit()
                                 conn.close()
                                 st.success("✅ Banco resetado com sucesso! Todos os dados foram apagados.")
