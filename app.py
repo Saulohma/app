@@ -184,6 +184,17 @@ migrar_excel()
 # ============================================================
 # FUNÇÕES
 # ============================================================
+
+def limpar_dados_corrompidos():
+    """Remove registros com dados de migração corrompidos"""
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM lavagens WHERE cliente IS NULL OR cliente = '' OR cliente = 'cliente'")
+        cur.execute("DELETE FROM mensalistas WHERE nome IS NULL OR nome = '' OR nome = 'nome'")
+        cur.execute("DELETE FROM precos WHERE tipo_veiculo IS NULL OR tipo_veiculo = ''")
+    conn.commit()
+    conn.close()
+
 def carregar_lavagens():
     conn = get_conn()
     df = pd.read_sql_query("SELECT * FROM lavagens ORDER BY id DESC", conn)
@@ -200,43 +211,47 @@ def carregar_mensalistas():
 
 def get_preco(tipo, servico):
     conn = get_conn()
-    c = conn.cursor()
-    c.execute("SELECT valor FROM precos WHERE tipo_veiculo=%s AND servico=%s", (tipo, servico))
-    r = c.fetchone()
+    with conn.cursor() as cur:
+        cur.execute("SELECT valor FROM precos WHERE tipo_veiculo=%s AND servico=%s", (tipo, servico))
+        r = cur.fetchone()
     conn.close()
     return r['valor'] if r else 0.0
 
 def registrar_lavagem(data, tipo, servico, valor, cliente, placa, quantidade):
     conn = get_conn()
-    conn.execute("""INSERT INTO lavagens (data,tipo_veiculo,servico,valor,cliente,placa,quantidade) VALUES (%s,%s,%s,%s,%s,%s,%s)""", (data,tipo,servico,valor,cliente,placa,quantidade))
+    with conn.cursor() as cur:
+        cur.execute("""INSERT INTO lavagens (data,tipo_veiculo,servico,valor,cliente,placa,quantidade) VALUES (%s,%s,%s,%s,%s,%s,%s)""", (data,tipo,servico,valor,cliente,placa,quantidade))
     conn.commit()
     conn.close()
 
 def adicionar_mensalista(nome, telefone, tipo, placa, plano, valor_plano, data_inicio):
     conn = get_conn()
-    conn.execute("""INSERT INTO mensalistas (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo) VALUES (%s,%s,%s,%s,%s,%s,%s,0)""", (nome,telefone,tipo,placa,plano,valor_plano,data_inicio))
+    with conn.cursor() as cur:
+        cur.execute("""INSERT INTO mensalistas (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo) VALUES (%s,%s,%s,%s,%s,%s,%s,0)""", (nome,telefone,tipo,placa,plano,valor_plano,data_inicio))
     conn.commit()
     conn.close()
 
 def atualizar_mensalista(id, nome, telefone, tipo, placa, plano, valor_plano, data_inicio, ativo):
     conn = get_conn()
-    conn.execute("""UPDATE mensalistas SET nome=%s,telefone=%s,tipo=%s,placa=%s,plano=%s,valor_plano=%s,data_inicio=%s,ativo=%s WHERE id=%s""", (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo,id))
+    with conn.cursor() as cur:
+        cur.execute("""UPDATE mensalistas SET nome=%s,telefone=%s,tipo=%s,placa=%s,plano=%s,valor_plano=%s,data_inicio=%s,ativo=%s WHERE id=%s""", (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo,id))
     conn.commit()
     conn.close()
 
 def toggle_mensalista(id):
     conn = get_conn()
-    c = conn.cursor()
-    c.execute("SELECT ativo FROM mensalistas WHERE id=%s", (id,))
-    r = c.fetchone()
-    if r:
-        conn.execute("UPDATE mensalistas SET ativo=%s WHERE id=%s", (0 if r['ativo'] else 1, id))
-        conn.commit()
+    with conn.cursor() as cur:
+        cur.execute("SELECT ativo FROM mensalistas WHERE id=%s", (id,))
+        r = cur.fetchone()
+        if r:
+            cur.execute("UPDATE mensalistas SET ativo=%s WHERE id=%s", (0 if r['ativo'] else 1, id))
+    conn.commit()
     conn.close()
 
 def excluir_mensalista(id):
     conn = get_conn()
-    conn.execute("DELETE FROM mensalistas WHERE id=%s", (id,))
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM mensalistas WHERE id=%s", (id,))
     conn.commit()
     conn.close()
 
@@ -417,6 +432,7 @@ with tab2:
 # -------- ABA 3: ANÁLISES EXECUTIVAS --------
 with tab3:
     st.markdown("#### 📊 Análises Executivas")
+    limpar_dados_corrompidos()
     df_lav = carregar_lavagens()
     df_mens = carregar_mensalistas()
     if not df_lav.empty:
