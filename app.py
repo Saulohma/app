@@ -424,10 +424,10 @@ with tab3:
         df_lav['mes_ano'] = df_lav['data'].dt.strftime('%Y-%m')
         df_lav['dia_semana'] = df_lav['data'].dt.dayofweek
         anos_disp = sorted(df_lav['ano'].unique(), reverse=True)
-        meses_disp = sorted(df_lav['mes'].unique())
+        meses_disp = sorted(int(m) for m in df['mes'].unique() if pd.notna(m))
         flt1, flt2, flt3 = st.columns(3)
         with flt1: ano_sel = st.selectbox("Ano", anos_disp, key="as")
-        with flt2: mes_sel = st.selectbox("Mês", [f"{m:02d}" for m in meses_disp], key="ms")
+        with flt2: mes_sel = st.selectbox("Mês", [f"{int(m):02d}" for m in meses_disp], key="ms")
         with flt3:
             servs = sorted(df_lav['servico'].unique())
             serv_sel = st.selectbox("Serviço", ["Todos"]+servs, key="ss")
