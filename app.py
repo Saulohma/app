@@ -356,13 +356,8 @@ with tab1:
         st.markdown("#### 📋 Últimas Lavagens")
         df_lav = carregar_lavagens()
         if not df_lav.empty:
-            exibir = df_lav[['data','cliente','tipo_veiculo','servico','valor','placa','quantidade']].head(10)
-            exibir['data'] = exibir['data'].dt.strftime('%d/%m/%Y')
-            total_valor = pd.to_numeric(df_lav['valor'], errors='coerce').sum()
-            exibir['valor'] = pd.to_numeric(exibir['valor'], errors='coerce').apply(lambda v: f"R$ {v:,.2f}".replace(",","X").replace(".",",").replace("X","."))
-            exibir.columns = ['Data','Cliente','Tipo','Serviço','Valor','Placa','Qtd']
-            st.dataframe(exibir, use_container_width=True, hide_index=True)
-            st.markdown(f"**Total:** {len(df_lav)} lavagens | **Valor total:** R$ {float(total_valor):,.2f}".replace(",","X").replace(".",",").replace("X","."))
+            df_lav['data'] = pd.to_datetime(df_lav['data'], errors='coerce')
+            df_lav = df_lav.dropna(subset=['data']).reset_index(drop=True)
         else:
             st.info("Nenhuma lavagem registrada ainda.")
 
