@@ -437,12 +437,13 @@ with tab3:
     df_mens = carregar_mensalistas()
     if not df_lav.empty:
         df_lav['data'] = pd.to_datetime(df_lav['data'], errors='coerce')
-        df_lav = df_lav.dropna(subset=['data'])
+        df_lav = df_lav.dropna(subset=['data']).reset_index(drop=True)
         df_lav['mes'] = df_lav['data'].dt.month
-    df_lav['mes_ano'] = df_lav['data'].dt.strftime('%Y-%m')
-    df_lav['dia_semana'] = df_lav['data'].dt.dayofweek
-    anos_disp = sorted(df_lav['ano'].unique(), reverse=True)
-    meses_disp = sorted(int(m) for m in df_lav['mes'].unique() if pd.notna(m))
+        df_lav['ano'] = df_lav['data'].dt.year
+        df_lav['mes_ano'] = df_lav['data'].dt.strftime('%Y-%m')
+        df_lav['dia_semana'] = df_lav['data'].dt.dayofweek
+        anos_disp = sorted(df_lav['ano'].unique(), reverse=True)
+        meses_disp = sorted(int(m) for m in df_lav['mes'].unique() if pd.notna(m))
     flt1, flt2, flt3 = st.columns(3)
     with flt1: ano_sel = st.selectbox("Ano", anos_disp, key="as")
     with flt2:
