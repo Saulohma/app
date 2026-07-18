@@ -12,6 +12,8 @@ import psycopg2
 from psycopg2.extras import RealDictCursor
 from hashlib import sha256
 
+DATABASE_URL = os.getenv("DATABASE_URL")   # ← ADICIONA ESTA LINHA
+
 # ============================================================
 # AUTENTICAÇÃO
 # ============================================================
