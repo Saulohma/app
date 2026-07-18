@@ -381,10 +381,11 @@ with tab2:
             mk1.metric("Total", total); mk2.metric("Ativos", ativos); mk3.metric("Inativos", inativos)
             mk4.metric("Receita Mensal", f"R${float(receita_mensal):,.0f}".replace(",","X").replace(".",",").replace("X","."))
             st.markdown("---")
+            df_mens['valor_plano'] = pd.to_numeric(df_mens['valor_plano'], errors='coerce').fillna(0)
             for _, row in df_mens.iterrows():
                 sc = "ativo" if row['ativo'] else "inativo"
                 stxt = "🟢 Ativo" if row['ativo'] else "🔴 Inativo"
-                st.markdown(f"""<div class="card-mensalista {sc}"><div style="display:flex;justify-content:space-between;align-items:start;"><div><div class="nome">{row['nome']}</div><div class="info">📞 {row['telefone'] or '—'}</div><div class="info">🚗 {row['tipo']} | {row['placa'] or '—'}</div><div class="info">📋 {row['plano']} — R$ {float(row['valor_plano']):.2f}</div><div class="info">📅 Início: {row['data_inicio'] or '—'}</div><div style="margin-top:6px;">{stxt}</div></div></div></div>""", unsafe_allow_html=True)
+                st.markdown(f"""<div class="card-mensalista {sc}"><div style="display:flex;justify-content:space-between;align-items:start;"><div><div class="nome">{row['nome']}</div><div class="info">📞 {row['telefone'] or '—'}</div><div class="info">🚗 {row['tipo']} | {row['placa'] or '—'}</div><div class="info">📋 {row['plano']} — R$ {row['valor_plano']:.2f}</div><div class="info">📅 Início: {row['data_inicio'] or '—'}</div><div style="margin-top:6px;">{stxt}</div></div></div></div>""", unsafe_allow_html=True)
                 c1, c2, c3 = st.columns([1,1,1])
                 with c1:
                     if st.button("🔄 Ativar/Desativar", key=f"t_{row['id']}", use_container_width=True):
