@@ -574,6 +574,15 @@ with tab1:
         if not df_lav.empty:
             df_lav['data'] = pd.to_datetime(df_lav['data'], errors='coerce')
             df_lav = df_lav.dropna(subset=['data']).reset_index(drop=True)
+
+            cols = [c for c in ['data','cliente','tipo_veiculo','servico','quantidade','valor','placa'] if c in df_lav.columns]
+            st.dataframe(df_lav[cols].head(20), use_container_width=True, hide_index=True)
+
+            # Totalizador
+            total = len(df_lav)
+            qtd_total = int(df_lav['quantidade'].sum()) if 'quantidade' in df_lav.columns and not df_lav['quantidade'].isna().all() else total
+            valor_total_lav = float(df_lav['valor'].sum()) if 'valor' in df_lav.columns else 0
+            st.markdown(f"**Total: {total} lavagens | Quantidade total: {qtd_total} | Valor total: R$ {valor_total_lav:,.2f}**")
         else:
             st.info("Nenhuma lavagem registrada ainda.")
 
