@@ -269,7 +269,13 @@ with tab1:
     with col_form:
         st.markdown("#### ✏️ Dados da Lavagem")
         tipo_veiculo = st.selectbox("Tipo de Veículo", ["Comum","SUV","Caminhonete","Moto"], key="tv")
-        servico = st.selectbox("Serviço", ["Completa","Simples","Ducha","Motor","Chaci","Moto"], key="sv")
+        servicos_por_tipo = {
+    "Comum": ["Completa", "Simples", "Ducha", "Motor", "Chaci", "Moto"],
+    "SUV": ["Completa", "Simples", "Ducha", "Motor", "Chaci", "Moto"],
+    "Caminhonete": ["Completa", "Simples", "Ducha", "Motor", "Chaci", "Moto"],
+    "Moto": ["Completa", "Simples"],
+}
+        servico = st.selectbox("Serviço", servicos_por_tipo[tipo_veiculo], key="sv")
         valor_base = get_preco(tipo_veiculo, servico)
         quantidade = st.number_input("Quantidade", min_value=1, value=1, step=1, key="qtd")
         valor_total = valor_base * quantidade
@@ -286,10 +292,10 @@ with tab1:
         st.markdown("#### 📋 Últimas Lavagens")
         df_lav = carregar_lavagens()
         if not df_lav.empty:
-            exibir = df_lav[['data','cliente','tipo_veiculo','servico','valor','placa']].head(10)
+            exibir = df_lav[['data','cliente','tipo_veiculo','servico','valor','placa','quantidade']].head(10)
             exibir['data'] = exibir['data'].dt.strftime('%d/%m/%Y')
             exibir['valor'] = exibir['valor'].apply(lambda v: f"R$ {v:,.2f}".replace(",","X").replace(".",",").replace("X","."))
-            exibir.columns = ['Data','Cliente','Tipo','Serviço','Valor','Placa']
+            exibir.columns = ['Data','Cliente','Tipo','Serviço','Valor','Placa','Qtd']
             st.dataframe(exibir, use_container_width=True, hide_index=True)
             total_valor = df_lav['valor'].sum()
             st.markdown(f"**Total:** {len(df_lav)} lavagens | **Valor total:** R$ {total_valor:,.2f}".replace(",","X").replace(".",",").replace("X","."))
