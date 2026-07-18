@@ -757,13 +757,24 @@ with tab3:
             st.markdown("##### 📈 Receita Diária")
             df_dia = df_filtro.groupby(df_filtro['data'].dt.strftime('%d/%m')).agg({'valor': 'sum', 'quantidade': 'sum'}).reset_index()
             if not df_dia.empty:
-                st.line_chart(df_dia.set_index('data')['valor'], use_container_width=True)
+                # Dados em formato longo para colorir por dia
+                st.bar_chart(df_dia.set_index('data')['valor'], use_container_width=True, color="#10b981")
 
         with col2:
             # 🏆 Ranking de Serviços
             st.markdown("##### 🏆 Ranking de Serviços")
             df_serv = df_filtro.groupby('servico').agg({'quantidade': 'sum', 'valor': 'sum'}).reset_index().sort_values('quantidade', ascending=False)
             if not df_serv.empty:
+                # Cores personalizadas por serviço
+                cores_servico = {
+                    'Completa': '#10b981',   # verde
+                    'Simples': '#3b82f6',    # azul
+                    'Ducha': '#f59e0b',      # amarelo
+                    'Motor': '#ef4444',      # vermelho
+                    'Chaci': '#8b5cf6',      # roxo
+                    'Moto': '#ec4899',       # rosa
+                }
+                df_serv['cor'] = df_serv['servico'].map(cores_servico).fillna('#6b7280')
                 st.bar_chart(df_serv.set_index('servico')['quantidade'], use_container_width=True)
 
         st.markdown("---")
@@ -771,10 +782,17 @@ with tab3:
         col3, col4 = st.columns(2)
 
         with col3:
-            # 🚗 Quantidade por Tipo de Veículo
+            # 🚗 Lavagens por Tipo
             st.markdown("##### 🚗 Lavagens por Tipo")
             df_tipo = df_filtro.groupby('tipo_veiculo').agg({'quantidade': 'sum', 'valor': 'sum'}).reset_index().sort_values('quantidade', ascending=False)
             if not df_tipo.empty:
+                cores_tipo = {
+                    'Comum': '#3b82f6',      # azul
+                    'SUV': '#10b981',        # verde
+                    'Caminhonete': '#f59e0b', # amarelo
+                    'Moto': '#ec4899',       # rosa
+                }
+                df_tipo['cor'] = df_tipo['tipo_veiculo'].map(cores_tipo).fillna('#6b7280')
                 st.bar_chart(df_tipo.set_index('tipo_veiculo')['quantidade'], use_container_width=True)
 
         with col4:
