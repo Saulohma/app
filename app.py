@@ -8,6 +8,43 @@ from pathlib import Path
 import io
 from io import BytesIO
 # ============================================================
+# AUTENTICAÇÃO
+# ============================================================
+import os
+from hashlib import sha256
+
+ADMIN_USER = "admin"
+ADMIN_PASS = "admin757"
+
+def check_password():
+    if "auth" not in st.session_state:
+        st.session_state.auth = False
+    
+    if st.session_state.auth:
+        return True
+    
+    st.markdown(
+        "<div style='text-align:center;padding:3rem 0 1rem 0;'>"
+        "<h1>🚗 Lava Jato</h1>"
+        "<p style='color:#888;font-size:1.1rem;'>Sistema de Gestão</p>"
+        "</div>",
+        unsafe_allow_html=True
+    )
+    
+    col1, col2, col3 = st.columns([1, 1.5, 1])
+    with col2:
+        st.markdown("#### 🔐 Acesso Restrito")
+        with st.form("login"):
+            user = st.text_input("Usuário", placeholder="Digite seu usuário")
+            pwd = st.text_input("Senha", type="password", placeholder="Digite sua senha")
+            if st.form_submit_button("Entrar", type="primary", use_container_width=True):
+                if user == ADMIN_USER and pwd == ADMIN_PASS:
+                    st.session_state.auth = True
+                    st.rerun()
+                else:
+                    st.error("❌ Usuário ou senha inválidos!")
+    return False
+# ============================================================
 # CONFIG
 # ============================================================
 st.set_page_config(
@@ -258,6 +295,11 @@ with col_title:
 
 st.markdown("---")
 
+
+# Proteção de login
+if not check_password():
+    st.stop()
+# =================
 # ============================================================
 # ABAS
 # ============================================================
