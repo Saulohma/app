@@ -714,9 +714,9 @@ with tab3:
             if serv_sel != "Todos":
                 df_filtro = df_filtro[df_filtro['servico'] == serv_sel]
 
-            total_lav = len(df_filtro)
-            receita_lav = float(df_filtro['valor'].sum()) if total_lav > 0 else 0
-            qtd_total_lav = int(df_filtro['quantidade'].sum()) if 'quantidade' in df_filtro.columns and total_lav > 0 else total_lav
+            qtd_total_lav = int(df_filtro['quantidade'].sum()) if 'quantidade' in df_filtro.columns and not df_filtro.empty else (len(df_filtro) if not df_filtro.empty else 0)
+            total_lav = qtd_total_lav  # Agora total_lav = quantidade total
+            receita_lav = float(df_filtro['valor'].sum()) if not df_filtro.empty else 0
             ticket_medio = receita_lav / qtd_total_lav if qtd_total_lav > 0 else 0
         else:
             st.info("Nenhuma lavagem com data válida.")
@@ -748,58 +748,74 @@ with tab3:
 
     st.markdown("---")
 
-    # --- GRÁFICOS (só se tiver dados) ---
+        # --- GRÁFICOS COLORIDOS (Altair) ---
     if not df_filtro.empty and 'data' in df_filtro.columns:
+        
         col1, col2 = st.columns(2)
 
         with col1:
-            # 📈 Receita Diária
+            # 📈 Receita Diária (colunas verdes)
             st.markdown("##### 📈 Receita Diária")
-            df_dia = df_filtro.groupby(df_filtro['data'].dt.strftime('%d/%m')).agg({'valor': 'sum', 'quantidade': 'sum'}).reset_index()
+            df_dia = df_filtro.groupby(df_filtro['data'].dt.strftime('%d/%m')).agg({'valor': 'sum', 'quantidade': 'sum'}).reset_index().rename(columns={'data': 'dia'})
             if not df_dia.empty:
-                # Dados em formato longo para colorir por dia
-                st.bar_chart(df_dia.set_index('data')['valor'], use_container_width=True, color="#10b981")
+                import altair as alt
+                chart = alt.Chart(df_dia).mark_bar(color='#10b981', size=20).encode(
+                    x=alt.X('dia:N', title='', axis=alt.Axis(labelAngle=0)),
+                    y=alt.Y('valor:Q', title='R$'),
+                    tooltip=['dia', 'valor']
+                ).properties(height=250)
+                st.altair_chart(chart, use_container_width=True)
 
         with col2:
-            # 🏆 Ranking de Serviços
+            # 🏆 Ranking de Serviços (cada serviço com uma cor)
             st.markdown("##### 🏆 Ranking de Serviços")
             df_serv = df_filtro.groupby('servico').agg({'quantidade': 'sum', 'valor': 'sum'}).reset_index().sort_values('quantidade', ascending=False)
             if not df_serv.empty:
-                # Cores personalizadas por serviço
-                cores_servico = {
-                    'Completa': '#10b981',   # verde
-                    'Simples': '#3b82f6',    # azul
-                    'Ducha': '#f59e0b',      # amarelo
-                    'Motor': '#ef4444',      # vermelho
-                    'Chaci': '#8b5cf6',      # roxo
-                    'Moto': '#ec4899',       # rosa
-                }
-                df_serv['cor'] = df_serv['servico'].map(cores_servico).fillna('#6b7280')
-                st.bar_chart(df_serv.set_index('servico')['quantidade'], use_container_width=True)
+                import altair as alt
+                cores_servico_scale = alt.Scale(domain=['Completa','Simples','Ducha','Motor','Chaci','Moto'],
+                                                 range=['#10b981','#3b82f6','#f59e0b','#ef4444','#8b5cf6','#ec4899'])
+                chart = alt.Chart(df_serv).mark_bar(size=30).encode(
+                    x=alt.X('quantidade:Q', title='Qtd'),
+                    y=alt.Y('servico:N', title='', sort='-x'),
+                    color=alt.Color('servico:N', scale=cores_servico_scale, legend=None),
+                    tooltip=['servico', 'quantidade', 'valor']
+                ).properties(height=250)
+                st.altair_chart(chart, use_container_width=True)
 
         st.markdown("---")
 
         col3, col4 = st.columns(2)
 
         with col3:
-            # 🚗 Lavagens por Tipo
+            # 🚗 Lavagens por Tipo (cada tipo com uma cor)
             st.markdown("##### 🚗 Lavagens por Tipo")
             df_tipo = df_filtro.groupby('tipo_veiculo').agg({'quantidade': 'sum', 'valor': 'sum'}).reset_index().sort_values('quantidade', ascending=False)
             if not df_tipo.empty:
-                cores_tipo = {
-                    'Comum': '#3b82f6',      # azul
-                    'SUV': '#10b981',        # verde
-                    'Caminhonete': '#f59e0b', # amarelo
-                    'Moto': '#ec4899',       # rosa
-                }
-                df_tipo['cor'] = df_tipo['tipo_veiculo'].map(cores_tipo).fillna('#6b7280')
-                st.bar_chart(df_tipo.set_index('tipo_veiculo')['quantidade'], use_container_width=True)
+                import altair as alt
+                cores_tipo_scale = alt.Scale(domain=['Comum','SUV','Caminhonete','Moto'],
+                                              range=['#3b82f6','#10b981','#f59e0b','#ec4899'])
+                chart = alt.Chart(df_tipo).mark_bar(size=30).encode(
+                    x=alt.X('quantidade:Q', title='Qtd'),
+                    y=alt.Y('tipo_veiculo:N', title='', sort='-x'),
+                    color=alt.Color('tipo_veiculo:N', scale=cores_tipo_scale, legend=None),
+                    tooltip=['tipo_veiculo', 'quantidade', 'valor']
+                ).properties(height=250)
+                st.altair_chart(chart, use_container_width=True)
 
         with col4:
             # 💰 Receita por Tipo
             st.markdown("##### 💰 Receita por Tipo")
             if not df_tipo.empty:
-                st.bar_chart(df_tipo.set_index('tipo_veiculo')['valor'], use_container_width=True)
+                import altair as alt
+                cores_tipo_scale = alt.Scale(domain=['Comum','SUV','Caminhonete','Moto'],
+                                              range=['#3b82f6','#10b981','#f59e0b','#ec4899'])
+                chart = alt.Chart(df_tipo).mark_bar(size=30).encode(
+                    x=alt.X('valor:Q', title='R$'),
+                    y=alt.Y('tipo_veiculo:N', title='', sort='-x'),
+                    color=alt.Color('tipo_veiculo:N', scale=cores_tipo_scale, legend=None),
+                    tooltip=['tipo_veiculo', 'valor', 'quantidade']
+                ).properties(height=250)
+                st.altair_chart(chart, use_container_width=True)
 
                 st.markdown("---")
 
@@ -846,10 +862,10 @@ with tab3:
             with col_c2:
                 st.markdown("##### 💰 Performance vs Meta")
                 metas_df = pd.DataFrame({
-                    'Indicador': ['Lavagens', 'Receita', 'Mensalistas', 'Ticket'],
-                    'Atual': [total_lav, receita_lav, mens_ativos, ticket_medio],
-                    'Meta': [meta_lav, meta_rec, meta_mens, meta_ticket],
-                })
+                'Indicador': ['Lavagens', 'Receita', 'Mensalistas', 'Ticket'],
+                'Atual': [qtd_total_lav, receita_lav, mens_ativos, ticket_medio],
+                'Meta': [meta_lav, meta_rec, meta_mens, meta_ticket],
+            })
                 # Mostra como texto formatado
                 for _, r in metas_df.iterrows():
                     pct = (r['Atual'] / r['Meta'] * 100) if r['Meta'] > 0 else 0
