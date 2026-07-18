@@ -427,10 +427,9 @@ with tab2:
 # -------- ABA 3: ANÁLISES EXECUTIVAS --------
 with tab3:
     st.markdown("#### 📊 Análises Executivas")
-    limpar_dados_corrompidos()
     df_lav = carregar_lavagens()
     df_mens = carregar_mensalistas()
-    if not df_lav.empty:
+    if not df_lav.empty and len(df_lav) > 0:
         df_lav['data'] = pd.to_datetime(df_lav['data'], errors='coerce')
         df_lav = df_lav.dropna(subset=['data']).reset_index(drop=True)
         df_lav['mes'] = df_lav['data'].dt.month
@@ -439,17 +438,52 @@ with tab3:
         df_lav['dia_semana'] = df_lav['data'].dt.dayofweek
         anos_disp = sorted(df_lav['ano'].unique(), reverse=True)
         meses_disp = sorted(int(m) for m in df_lav['mes'].unique() if pd.notna(m))
-    flt1, flt2, flt3 = st.columns(3)
-    with flt1: ano_sel = st.selectbox("Ano", anos_disp, key="as")
-    with flt2:
-        if meses_disp:
-            mes_sel = st.selectbox("Mês", [f"{int(m):02d}" for m in meses_disp], key="ms")
+        flt1, flt2, flt3 = st.columns(3)
+        with flt1: ano_sel = st.selectbox("Ano", anos_disp, key="as")
+        with flt2:
+            if meses_disp:
+                mes_sel = st.selectbox("Mês", [f"{int(m):02d}" for m in meses_disp], key="ms")
+            else:
+                mes_sel = None
+                st.selectbox("Mês", ["—"], key="ms")
+        with flt3:
+            servs = sorted(df_lav['servico'].unique())
+            serv_sel = st.selectbox("Serviço", ["Todos"]+servs, key="ss")
+        if mes_sel is not None:
+            df_filtro = df_lav[(df_lav['ano']==ano_sel)&(df_lav['mes']==int(mes_sel))]
         else:
-            mes_sel = None
-            st.selectbox("Mês", ["—"], key="ms")
-    with flt3:
-        servs = sorted(df_lav['servico'].unique())
-        serv_sel = st.selectbox("Serviço", ["Todos"]+servs, key="ss")
+            df_filtro = df_lav.copy()
+        if serv_sel!="Todos":
+            df_filtro = df_filtro[df_filtro['servico']==serv_sel]
+        total_lav = len(df_filtro)
+        receita_lav = df_filtro['valor'].sum() if total_lav>0 else 0
+        ticket_medio = receita_lav/total_lav if total_lav>0 else 0
+        mens_ativos = len(df_mens[df_mens['ativo']==1]) if not df_mens.empty else 0
+        meta_lav=20; meta_rec=3000; meta_mens=3; meta_ticket=120
+
+        def sf(v,m):
+            if v>=m: return "verde"
+            elif v>=m*0.7: return "amarelo"
+            else: return "vermelho"
+
+        s_lav=sf(total_lav,meta_lav); s_rec=sf(receita_lav,meta_rec); s_mens=sf(mens_ativos,meta_mens); s_tick=sf(ticket_medio,meta_ticket)
+        k1,k2,k3,k4 = st.columns(4)
+        for c,s,t,v,meta in [(k1,s_lav,"Lavagens no Mês",total_lav,meta_lav),(k2,s_rec,"Receita Lavagens",f"R$ {receita_lav:,.2f}",f"R$ {meta_rec:,.0f}"),(k3,s_mens,"Mensalistas Ativos",mens_ativos,meta_mens),(k4,s_tick,"Ticket Médio",f"R$ {ticket_medio:,.2f}",f"R$ {meta_ticket:,.0f}")]:
+            c.markdown(f"""<div class="card-executivo {s}"><div class="kpi-label">{t}</div><div class="kpi-value">{v}</div><div class="kpi-meta">Meta: {meta}</div><div class="semaforo {s}">{s.upper()}</div></div>""", unsafe_allow_html=True)
+
+        st.markdown("---")
+        # GRÁFICO
+        df_dia = df_filtro.groupby(df_filtro['data'].dt.strftime('%d/%m')).agg({'valor':'sum','cliente':'count'}).reset_index().rename(columns={'cliente':'qtd','valor':'receita'})
+        if not df_dia.empty:
+            st.markdown("##### 📈 Receita Diária")
+            st.line_chart(df_dia.set_index('data')['receita'])
+        
+        st.markdown("---")
+        st.markdown("##### 📋 Últimas Lavagens")
+        st.dataframe(df_filtro[['data','cliente','tipo_veiculo','servico','valor','placa','quantidade']].head(20), use_container_width=True, hide_index=True)
+    else:
+        st.info("Nenhuma lavagem registrada ainda.")
+
 
     # Filtro seguro — sempre gera df_filtro
     if mes_sel is not None:
