@@ -549,11 +549,11 @@ with tab3:
     else:
         st.info("💡 Nenhum dado de lavagem ainda. Registre lavagens para ver as análises.")
 
-st.markdown("---")
+        st.markdown("---")
 
         st.markdown("---")
-    with st.expander("⚠️ **Administrador — Resetar Banco de Dados**"):
-        col1, col2 = st.columns([1, 1])
+        with st.expander("⚠️ **Administrador — Resetar Banco de Dados**"):
+                col1, col2 = st.columns([1, 1])
         with col1:
             senha_reset = st.text_input("Digite a senha de administrador para resetar:", type="password", key="senha_reset")
         with col2:
