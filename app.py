@@ -381,6 +381,93 @@ def get_preco(tipo_veiculo, servico):
     }
     return precos_fallback.get((tipo_veiculo, servico), 0)
 
+def carregar_lavagens():
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("SELECT * FROM lavagens ORDER BY data DESC")
+        rows = cur.fetchall()
+    conn.close()
+    if not rows: return pd.DataFrame()
+    return pd.DataFrame(rows)
+
+def carregar_mensalistas():
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("SELECT * FROM mensalistas ORDER BY nome")
+        rows = cur.fetchall()
+    conn.close()
+    if not rows: return pd.DataFrame()
+    return pd.DataFrame(rows)
+
+def registrar_lavagem(data, tipo_veiculo, servico, valor, cliente, placa, quantidade):
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("""INSERT INTO lavagens (data,tipo_veiculo,servico,valor,cliente,placa,quantidade) VALUES (%s,%s,%s,%s,%s,%s,%s)""", (data,tipo_veiculo,servico,valor,cliente,placa,quantidade))
+    conn.commit()
+    conn.close()
+
+def get_preco(tipo_veiculo, servico):
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("SELECT valor FROM precos WHERE tipo_veiculo=%s AND servico=%s", (tipo_veiculo, servico))
+        r = cur.fetchone()
+    conn.close()
+    if r:
+        return float(r['valor'])
+    precos_fallback = {
+        ('Comum', 'Lavagem Simples'): 20, ('Comum', 'Lavagem Completa'): 35,
+        ('SUV', 'Lavagem Simples'): 30, ('SUV', 'Lavagem Completa'): 50,
+        ('Caminhonete', 'Lavagem Simples'): 35, ('Caminhonete', 'Lavagem Completa'): 55,
+        ('Moto', 'Lavagem Simples'): 15, ('Moto', 'Lavagem Completa'): 25,
+    }
+    return precos_fallback.get((tipo_veiculo, servico), 0)
+
+def adicionar_mensalista(nome, telefone, tipo, placa, plano, valor_plano, data_inicio):
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("""INSERT INTO mensalistas (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo) VALUES (%s,%s,%s,%s,%s,%s,%s,1)""", (nome,telefone,tipo,placa,plano,valor_plano,data_inicio))
+    conn.commit()
+    conn.close()
+
+def atualizar_mensalista(id, nome, telefone, tipo, placa, plano, valor_plano, data_inicio, ativo):
+    try:
+        id_int = int(id)
+    except (ValueError, TypeError):
+        st.error("ID inválido para atualização")
+        return
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("""UPDATE mensalistas SET nome=%s,telefone=%s,tipo=%s,placa=%s,plano=%s,valor_plano=%s,data_inicio=%s,ativo=%s WHERE id=%s""", (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo,id_int))
+    conn.commit()
+    conn.close()
+
+def toggle_mensalista(id):
+    try:
+        id_int = int(id)
+    except (ValueError, TypeError):
+        st.error("ID inválido para alternar status")
+        return
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("SELECT ativo FROM mensalistas WHERE id=%s", (id_int,))
+        r = cur.fetchone()
+        if r:
+            cur.execute("UPDATE mensalistas SET ativo=%s WHERE id=%s", (0 if r['ativo'] else 1, id_int))
+    conn.commit()
+    conn.close()
+
+def excluir_mensalista(id):
+    try:
+        id_int = int(id)
+    except (ValueError, TypeError):
+        st.error("ID inválido para exclusão")
+        return
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM mensalistas WHERE id=%s", (id_int,))
+    conn.commit()
+    conn.close()
+
 init_db()
 migrar_excel()
 limpar_dados_corrompidos() 
