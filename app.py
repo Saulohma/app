@@ -352,8 +352,8 @@ with tab1:
             exibir['valor'] = exibir['valor'].apply(lambda v: f"R$ {v:,.2f}".replace(",","X").replace(".",",").replace("X","."))
             exibir.columns = ['Data','Cliente','Tipo','Serviço','Valor','Placa','Qtd']
             st.dataframe(exibir, use_container_width=True, hide_index=True)
-            total_valor = df_lav['valor'].sum()
-            st.markdown(f"**Total:** {len(df_lav)} lavagens | **Valor total:** R$ {total_valor:,.2f}".replace(",","X").replace(".",",").replace("X","."))
+            total_valor = float(df_lav['valor'].sum())
+            st.markdown(f"**Total:** {len(df_lav)} lavagens | **Valor total:** R$ {float(total_valor):,.2f}".replace(",","X").replace(".",",").replace("X","."))
         else:
             st.info("Nenhuma lavagem registrada ainda.")
 
