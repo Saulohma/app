@@ -199,96 +199,168 @@ def migrar_excel():
 
 
 
-
 # ============================================================
 # FUNÇÕES
 # ============================================================
+
+def get_conn():
+    return psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
+
+def init_db():
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS lavagens (
+                id SERIAL PRIMARY KEY, data DATE, tipo_veiculo TEXT,
+                servico TEXT, valor NUMERIC, cliente TEXT,
+                placa TEXT, quantidade INTEGER
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS mensalistas (
+                id SERIAL PRIMARY KEY, nome TEXT, telefone TEXT,
+                tipo TEXT, placa TEXT, plano TEXT,
+                valor_plano NUMERIC, data_inicio DATE, ativo INTEGER DEFAULT 0
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS precos (
+                id SERIAL PRIMARY KEY, tipo_veiculo TEXT,
+                servico TEXT, valor NUMERIC
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS _migracao_feita (
+                id SERIAL PRIMARY KEY, concluida BOOLEAN DEFAULT TRUE
+            )
+        """)
+    conn.commit()
+    conn.close()
+
+def migracao_ja_feita():
+    """Retorna True se a migração já foi executada alguma vez"""
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) AS total FROM _migracao_feita")
+        r = cur.fetchone()
+    conn.close()
+    return list(r.values())[0] > 0
+
+def is_header_row(r, col_names):
+    """Detecta se a linha do Excel é cabeçalho repetido"""
+    vals = [str(r.get(c, '')).strip().lower() for c in col_names if r.get(c)]
+    if not vals:
+        return False
+    expected = [c.lower() for c in col_names]
+    return any(v in expected for v in vals)
+
+def migrar_excel():
+    if migracao_ja_feita():
+        return  # Já migrou uma vez, NUNCA mais repete
+
+    conn = get_conn()
+    cursor = conn.cursor()
+
+    # --- LAVAGENS ---
+    xlsx = Path(__file__).parent / "dados.xlsx"
+    if xlsx.exists():
+        try:
+            df = pd.read_excel(str(xlsx))
+            col_map = {'data':'data','Data':'data','tipo_veiculo':'tipo_veiculo','Tipo':'tipo_veiculo',
+                       'servico':'servico','Serviço':'servico','valor':'valor','Valor':'valor',
+                       'cliente':'cliente','Cliente':'cliente','placa':'placa','Placa':'placa',
+                       'quantidade':'quantidade','Quantidade':'quantidade'}
+            cols_lav = ['data','tipo_veiculo','servico','valor','cliente','placa','quantidade']
+            for _, r in df.iterrows():
+                if is_header_row(r, cols_lav):
+                    continue  # Pula linha de cabeçalho
+                d = r.get('data') or r.get('Data') or date.today()
+                if isinstance(d, (datetime, pd.Timestamp)): d = d.strftime('%Y-%m-%d')
+                elif isinstance(d, str):
+                    try: d = datetime.strptime(d.strip(), '%d/%m/%Y').strftime('%Y-%m-%d')
+                    except: d = date.today().strftime('%Y-%m-%d')
+                else: d = date.today().strftime('%Y-%m-%d')
+                t = str(r.get('tipo_veiculo') or r.get('Tipo') or 'Comum').strip()
+                s = str(r.get('servico') or r.get('Serviço') or '').strip()
+                try: v = float(r.get('valor') or r.get('Valor') or 0)
+                except: v = 0
+                c = str(r.get('cliente') or r.get('Cliente') or '').strip().upper()
+                p = str(r.get('placa') or r.get('Placa') or '').strip().upper()
+                try: q = int(r.get('quantidade') or r.get('Quantidade') or 1)
+                except: q = 1
+                # Usa INSERT com verificação ON CONFLICT (funciona com chave única)
+                cursor.execute("""INSERT INTO lavagens (data,tipo_veiculo,servico,valor,cliente,placa,quantidade) VALUES (%s,%s,%s,%s,%s,%s,%s)""", (d,t,s,v,c,p,q))
+            conn.commit()
+        except Exception as e:
+            print(f"Migração lavagens: {e}")
+
+    # --- MENSALISTAS ---
+    xlsxm = Path(__file__).parent / "mensalistas.xlsx"
+    if xlsxm.exists():
+        try:
+            df = pd.read_excel(str(xlsxm))
+            cols_mens = ['nome','telefone','tipo','placa','plano','valor_plano','data_inicio','ativo']
+            for _, r in df.iterrows():
+                if is_header_row(r, cols_mens):
+                    continue  # Pula linha de cabeçalho
+                n = str(r.get('nome') or r.get('Nome') or '').strip().upper()
+                if not n or n == 'NOME':
+                    continue  # Pula vazio/cabeçalho
+                t = str(r.get('telefone') or r.get('Telefone') or '')
+                tp = str(r.get('tipo') or r.get('Tipo') or 'Comum').strip()
+                if tp.lower() in ('tipo', ''):
+                    tp = 'Comum'
+                p = str(r.get('placa') or r.get('Placa') or '').upper()
+                pl = str(r.get('plano') or r.get('Plano') or 'Valor Fixo Mensal').strip()
+                if pl.lower() in ('plano', ''):
+                    pl = 'Valor Fixo Mensal'
+                try: v = float(r.get('valor_plano') or r.get('Valor Plano') or r.get('valor') or 0)
+                except: v = 0
+                di = r.get('data_inicio') or r.get('Data Início') or r.get('data') or date.today()
+                if isinstance(di, (datetime, pd.Timestamp)): di = di.strftime('%Y-%m-%d')
+                elif isinstance(di, str):
+                    try: di = datetime.strptime(di.strip(), '%d/%m/%Y').strftime('%Y-%m-%d')
+                    except: di = date.today().strftime('%Y-%m-%d')
+                else: di = date.today().strftime('%Y-%m-%d')
+                try: a = int(r.get('ativo') or r.get('Ativo') or 1)
+                except: a = 1  # DEFAULT: ATIVO
+                cursor.execute("""INSERT INTO mensalistas (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""", (n,t,tp,p,pl,v,di,a))
+            conn.commit()
+        except Exception as e:
+            print(f"Migração mensalistas: {e}")
+
+    # --- PRECOS ---
+    if not xlsx.exists() and not xlsxm.exists():
+        precos_default = [
+            ('Comum', 'Lavagem Simples', 20), ('Comum', 'Lavagem Completa', 35),
+            ('SUV', 'Lavagem Simples', 30), ('SUV', 'Lavagem Completa', 50),
+            ('Caminhonete', 'Lavagem Simples', 35), ('Caminhonete', 'Lavagem Completa', 55),
+            ('Moto', 'Lavagem Simples', 15), ('Moto', 'Lavagem Completa', 25),
+        ]
+        for tp, sv, vl in precos_default:
+            cursor.execute("SELECT COUNT(*) AS total FROM precos WHERE tipo_veiculo=%s AND servico=%s", (tp, sv))
+            if list(cursor.fetchone().values())[0] == 0:
+                cursor.execute("INSERT INTO precos (tipo_veiculo,servico,valor) VALUES (%s,%s,%s)", (tp, sv, vl))
+        conn.commit()
+
+    # Marca migração como concluída (NUNCA mais roda)
+    cursor.execute("INSERT INTO _migracao_feita (concluida) VALUES (TRUE)")
+    conn.commit()
+    conn.close()
 
 def limpar_dados_corrompidos():
     """Remove registros com dados de migração corrompidos"""
     conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("DELETE FROM lavagens WHERE cliente IS NULL OR cliente = '' OR cliente = 'cliente'")
+        cur.execute("DELETE FROM lavagens WHERE data IS NULL")
         cur.execute("DELETE FROM mensalistas WHERE nome IS NULL OR nome = '' OR nome = 'nome'")
         cur.execute("DELETE FROM mensalistas WHERE id::text !~ '^[0-9]+$'")
+        cur.execute("DELETE FROM mensalistas WHERE telefone = 'telefone' OR plano = 'plano'")
         cur.execute("DELETE FROM precos WHERE tipo_veiculo IS NULL OR tipo_veiculo = ''")
     conn.commit()
     conn.close()
 
-def carregar_lavagens():
-    conn = get_conn()
-    df = pd.read_sql_query("SELECT * FROM lavagens ORDER BY id DESC", conn)
-    conn.close()
-    if not df.empty:
-        df['data'] = pd.to_datetime(df['data'], errors='coerce')
-    return df
-
-def carregar_mensalistas():
-    conn = get_conn()
-    df = pd.read_sql_query("SELECT * FROM mensalistas ORDER BY nome ASC", conn)
-    conn.close()
-    return df
-
-def get_preco(tipo, servico):
-    conn = get_conn()
-    with conn.cursor() as cur:
-        cur.execute("SELECT valor FROM precos WHERE tipo_veiculo=%s AND servico=%s", (tipo, servico))
-        r = cur.fetchone()
-    conn.close()
-    return r['valor'] if r else 0.0
-
-def registrar_lavagem(data, tipo, servico, valor, cliente, placa, quantidade):
-    conn = get_conn()
-    with conn.cursor() as cur:
-        cur.execute("""INSERT INTO lavagens (data,tipo_veiculo,servico,valor,cliente,placa,quantidade) VALUES (%s,%s,%s,%s,%s,%s,%s)""", (data,tipo,servico,valor,cliente,placa,quantidade))
-    conn.commit()
-    conn.close()
-
-def adicionar_mensalista(nome, telefone, tipo, placa, plano, valor_plano, data_inicio):
-    conn = get_conn()
-    with conn.cursor() as cur:
-        cur.execute("""INSERT INTO mensalistas (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo) VALUES (%s,%s,%s,%s,%s,%s,%s,0)""", (nome,telefone,tipo,placa,plano,valor_plano,data_inicio))
-    conn.commit()
-    conn.close()
-
-def atualizar_mensalista(id, nome, telefone, tipo, placa, plano, valor_plano, data_inicio, ativo):
-    try:
-        id_int = int(id)
-    except (ValueError, TypeError):
-        st.error("ID inválido para atualização")
-        return
-    conn = get_conn()
-    with conn.cursor() as cur:
-        cur.execute("""UPDATE mensalistas SET nome=%s,telefone=%s,tipo=%s,placa=%s,plano=%s,valor_plano=%s,data_inicio=%s,ativo=%s WHERE id=%s""", (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo,id_int))
-    conn.commit()
-    conn.close()
-
-def toggle_mensalista(id):
-    try:
-        id_int = int(id)
-    except (ValueError, TypeError):
-        st.error("ID inválido para alternar status")
-        return
-    conn = get_conn()
-    with conn.cursor() as cur:
-        cur.execute("SELECT ativo FROM mensalistas WHERE id=%s", (id_int,))
-        r = cur.fetchone()
-        if r:
-            cur.execute("UPDATE mensalistas SET ativo=%s WHERE id=%s", (0 if r['ativo'] else 1, id_int))
-    conn.commit()
-    conn.close()
-
-def excluir_mensalista(id):
-    try:
-        id_int = int(id)
-    except (ValueError, TypeError):
-        st.error("ID inválido para exclusão")
-        return
-    conn = get_conn()
-    with conn.cursor() as cur:
-        cur.execute("DELETE FROM mensalistas WHERE id=%s", (id_int,))
-    conn.commit()
-    conn.close()
 
 
 init_db()
