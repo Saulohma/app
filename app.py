@@ -198,9 +198,7 @@ def migrar_excel():
     conn.close()
 
 
-init_db()
-migrar_excel()
-limpar_dados_corrompidos() 
+
 
 # ============================================================
 # FUNÇÕES
@@ -292,6 +290,10 @@ def excluir_mensalista(id):
     conn.commit()
     conn.close()
 
+
+init_db()
+migrar_excel()
+limpar_dados_corrompidos() 
 # ============================================================
 # CSS
 # ============================================================
