@@ -270,11 +270,11 @@ with tab1:
         st.markdown("#### ✏️ Dados da Lavagem")
         tipo_veiculo = st.selectbox("Tipo de Veículo", ["Comum","SUV","Caminhonete","Moto"], key="tv")
         servicos_por_tipo = {
-    "Comum": ["Completa", "Simples", "Ducha", "Motor", "Chaci", "Moto"],
-    "SUV": ["Completa", "Simples", "Ducha", "Motor", "Chaci", "Moto"],
-    "Caminhonete": ["Completa", "Simples", "Ducha", "Motor", "Chaci", "Moto"],
-    "Moto": ["Completa", "Simples"],
-}
+        "Comum": ["Completa", "Simples", "Ducha", "Motor", "Chaci", "Moto"],
+        "SUV": ["Completa", "Simples", "Ducha", "Motor", "Chaci", "Moto"],
+        "Caminhonete": ["Completa", "Simples", "Ducha", "Motor", "Chaci", "Moto"],
+        "Moto": ["Moto"],
+         }
         servico = st.selectbox("Serviço", servicos_por_tipo[tipo_veiculo], key="sv")
         valor_base = get_preco(tipo_veiculo, servico)
         quantidade = st.number_input("Quantidade", min_value=1, value=1, step=1, key="qtd")
