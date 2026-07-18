@@ -7,6 +7,9 @@ import sqlite3
 from pathlib import Path
 import io
 from io import BytesIO
+import os
+import psycopg2
+from psycopg2.extras import RealDictCursor
 # ============================================================
 # AUTENTICAÇÃO
 # ============================================================
@@ -58,26 +61,28 @@ st.set_page_config(
 # ============================================================
 # BANCO DE DADOS
 # ============================================================
-DB_PATH = Path(__file__).parent / "lava_jato.db"
+DB_URL = os.environ.get("DATABASE_URL", "")
 
 def get_conn():
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
+    conn = psycopg2.connect(DB_URL)
+    conn.autocommit = True
     return conn
 
 def init_db():
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.executescript("""
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS precos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             tipo_veiculo TEXT NOT NULL,
             servico TEXT NOT NULL,
             valor REAL NOT NULL,
             UNIQUE(tipo_veiculo, servico)
-        );
+        )
+    """)
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS lavagens (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             data DATE NOT NULL,
             tipo_veiculo TEXT NOT NULL,
             servico TEXT NOT NULL,
@@ -86,9 +91,11 @@ def init_db():
             placa TEXT DEFAULT '',
             quantidade INTEGER DEFAULT 1,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
+        )
+    """)
+    cursor.execute("""
         CREATE TABLE IF NOT EXISTS mensalistas (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            id SERIAL PRIMARY KEY,
             nome TEXT NOT NULL,
             telefone TEXT DEFAULT '',
             tipo TEXT DEFAULT 'Comum',
@@ -98,7 +105,7 @@ def init_db():
             data_inicio DATE,
             ativo INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        );
+        )
     """)
     precos_padrao = [
         ('Comum', 'Completa', 250.0), ('Comum', 'Simples', 90.0),
@@ -115,7 +122,10 @@ def init_db():
         ('Moto', 'Chaci', 90.0), ('Moto', 'Moto', 35.0),
     ]
     for tipo, servico, valor in precos_padrao:
-        cursor.execute("INSERT OR IGNORE INTO precos (tipo_veiculo, servico, valor) VALUES (?, ?, ?)", (tipo, servico, valor))
+        cursor.execute(
+            "INSERT INTO precos (tipo_veiculo, servico, valor) VALUES (%s, %s, %s) ON CONFLICT (tipo_veiculo, servico) DO NOTHING",
+            (tipo, servico, valor)
+        )
     conn.commit()
     conn.close()
   
