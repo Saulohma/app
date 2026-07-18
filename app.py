@@ -376,7 +376,7 @@ with tab2:
         st.markdown("#### 📋 Mensalistas")
         if not df_mens.empty:
             total = len(df_mens); ativos = len(df_mens[df_mens['ativo']==1]); inativos = total - ativos
-            receita_mensal = df_mens[df_mens['ativo']==1]['valor_plano'].sum()
+            receita_mensal = pd.to_numeric(df_mens.loc[df_mens['ativo']==1, 'valor_plano'], errors='coerce').sum()
             mk1, mk2, mk3, mk4 = st.columns(4)
             mk1.metric("Total", total); mk2.metric("Ativos", ativos); mk3.metric("Inativos", inativos)
             mk4.metric("Receita Mensal", f"R${float(receita_mensal):,.0f}".replace(",","X").replace(".",",").replace("X","."))
