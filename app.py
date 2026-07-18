@@ -191,6 +191,7 @@ def limpar_dados_corrompidos():
     with conn.cursor() as cur:
         cur.execute("DELETE FROM lavagens WHERE cliente IS NULL OR cliente = '' OR cliente = 'cliente'")
         cur.execute("DELETE FROM mensalistas WHERE nome IS NULL OR nome = '' OR nome = 'nome'")
+        cur.execute("DELETE FROM mensalistas WHERE id::text !~ '^[0-9]+$'")  # ← NOVA: remove id não numérico
         cur.execute("DELETE FROM precos WHERE tipo_veiculo IS NULL OR tipo_veiculo = ''")
     conn.commit()
     conn.close()
