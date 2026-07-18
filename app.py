@@ -613,11 +613,14 @@ with tab2:
     st.markdown("---")
     df_mens['valor_plano'] = pd.to_numeric(df_mens['valor_plano'], errors='coerce').fillna(0)
     df_mens = df_mens.reset_index(drop=True)
-    for idx, row in df_mens.iterrows():
-        ativo_bool = bool(int(row['ativo'])) if row['ativo'] is not None else False
-        sc = "ativo" if ativo_bool else "inativo"
-        stxt = "🟢 Ativo" if ativo_bool else "🟥 Inativo"
-        cor_borda = "#10b981" if ativo_bool else "#ef4444"
+    if df_mens.empty:
+        st.info("Nenhum mensalista cadastrado.")
+    else:
+        for idx, row in df_mens.iterrows():
+            ativo_bool = bool(int(row['ativo'])) if row['ativo'] is not None else False
+            sc = "ativo" if ativo_bool else "inativo"
+            stxt = "🟢 Ativo" if ativo_bool else "🟥 Inativo"
+            cor_borda = "#10b981" if ativo_bool else "#ef4444"
         st.markdown(f"""<div class="card-mensalista {sc}" style="border-color: {cor_borda} !important; border-width: 2px !important;"><div style="display:flex;justify-content:space-between;align-items:start;"><div><div class="nome">{row['nome']}</div><div class="info">📞 {row['telefone']}</div><div class="info">{row['tipo']} | {row['placa']}</div><div class="info">{row['plano']} — R$ {float(row['valor_plano']):.2f}</div><div class="info">📅 Início: {row['data_inicio']}</div></div>{stxt}</div></div>""", unsafe_allow_html=True)
         c1, c2, c3 = st.columns([1,1,1])
         with c1:
@@ -644,7 +647,7 @@ with tab2:
                     atualizar_mensalista(row['id'], en, et, etp, ep, epl, ev, ed.strftime("%Y-%m-%d"), 1 if ea else 0)
                     st.session_state[f'ed_{idx}'] = False; st.rerun()
         st.markdown("---")
-    else:
+        else:
         st.info("Nenhum mensalista cadastrado.")
 
 # -------- ABA 3: ANÁLISES EXECUTIVAS --------
