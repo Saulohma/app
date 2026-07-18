@@ -190,7 +190,7 @@ def carregar_lavagens():
     conn = get_conn()
     df = pd.read_sql_query("SELECT * FROM lavagens ORDER BY id DESC", conn)
     conn.close()
-    if not df.empty: df['data'] = pd.to_datetime(df['data'])
+    if not df.empty: df['data'] = pd.to_datetime(df['data'], errors='coerce')
     return df
 
 def carregar_mensalistas():
