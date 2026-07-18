@@ -583,7 +583,7 @@ with tab2:
     with col_cad:
         st.markdown("#### ➕ Novo Mensalista")
         if 'refresh_key' not in st.session_state:
-        st.session_state.refresh_key = 0
+            st.session_state.refresh_key = 0
 
     df_mens = carregar_mensalistas()
     with st.form("form_mens"):
