@@ -191,7 +191,7 @@ def limpar_dados_corrompidos():
     with conn.cursor() as cur:
         cur.execute("DELETE FROM lavagens WHERE cliente IS NULL OR cliente = '' OR cliente = 'cliente'")
         cur.execute("DELETE FROM mensalistas WHERE nome IS NULL OR nome = '' OR nome = 'nome'")
-        cur.execute("DELETE FROM mensalistas WHERE id::text !~ '^[0-9]+$'")  # ← NOVA: remove id não numérico
+        cur.execute("DELETE FROM mensalistas WHERE id::text !~ '^[0-9]+$'")
         cur.execute("DELETE FROM precos WHERE tipo_veiculo IS NULL OR tipo_veiculo = ''")
     conn.commit()
     conn.close()
@@ -233,26 +233,41 @@ def adicionar_mensalista(nome, telefone, tipo, placa, plano, valor_plano, data_i
     conn.close()
 
 def atualizar_mensalista(id, nome, telefone, tipo, placa, plano, valor_plano, data_inicio, ativo):
+    try:
+        id_int = int(id)
+    except (ValueError, TypeError):
+        st.error("ID inválido para atualização")
+        return
     conn = get_conn()
     with conn.cursor() as cur:
-        cur.execute("""UPDATE mensalistas SET nome=%s,telefone=%s,tipo=%s,placa=%s,plano=%s,valor_plano=%s,data_inicio=%s,ativo=%s WHERE id=%s""", (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo,id))
+        cur.execute("""UPDATE mensalistas SET nome=%s,telefone=%s,tipo=%s,placa=%s,plano=%s,valor_plano=%s,data_inicio=%s,ativo=%s WHERE id=%s""", (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo,id_int))
     conn.commit()
     conn.close()
 
 def toggle_mensalista(id):
+    try:
+        id_int = int(id)
+    except (ValueError, TypeError):
+        st.error("ID inválido para alternar status")
+        return
     conn = get_conn()
     with conn.cursor() as cur:
-        cur.execute("SELECT ativo FROM mensalistas WHERE id=%s", (id,))
+        cur.execute("SELECT ativo FROM mensalistas WHERE id=%s", (id_int,))
         r = cur.fetchone()
         if r:
-            cur.execute("UPDATE mensalistas SET ativo=%s WHERE id=%s", (0 if r['ativo'] else 1, id))
+            cur.execute("UPDATE mensalistas SET ativo=%s WHERE id=%s", (0 if r['ativo'] else 1, id_int))
     conn.commit()
     conn.close()
 
 def excluir_mensalista(id):
+    try:
+        id_int = int(id)
+    except (ValueError, TypeError):
+        st.error("ID inválido para exclusão")
+        return
     conn = get_conn()
     with conn.cursor() as cur:
-        cur.execute("DELETE FROM mensalistas WHERE id=%s", (id,))
+        cur.execute("DELETE FROM mensalistas WHERE id=%s", (id_int,))
     conn.commit()
     conn.close()
 
