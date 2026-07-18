@@ -344,7 +344,7 @@ with tab1:
             exibir = df_lav[['data','cliente','tipo_veiculo','servico','valor','placa','quantidade']].head(10)
             exibir['data'] = exibir['data'].dt.strftime('%d/%m/%Y')
             total_valor = pd.to_numeric(df_lav['valor'], errors='coerce').sum()
-            exibir['valor'] = pd.to_numeric(exibir['valor'], errors='coerce').apply(lambda v: f"R$ {v::,.2f}".replace(",","X").replace(".",",").replace("X","."))
+            exibir['valor'] = pd.to_numeric(exibir['valor'], errors='coerce').apply(lambda v: f"R$ {v:,.2f}".replace(",","X").replace(".",",").replace("X","."))
             exibir.columns = ['Data','Cliente','Tipo','Serviço','Valor','Placa','Qtd']
             st.dataframe(exibir, use_container_width=True, hide_index=True)
             st.markdown(f"**Total:** {len(df_lav)} lavagens | **Valor total:** R$ {float(total_valor):,.2f}".replace(",","X").replace(".",",").replace("X","."))
@@ -445,7 +445,7 @@ with tab3:
 
         s_lav=sf(total_lav,meta_lav); s_rec=sf(receita_lav,meta_rec); s_mens=sf(mens_ativos,meta_mens); s_tick=sf(ticket_medio,meta_ticket)
         k1,k2,k3,k4 = st.columns(4)
-        for c,s,t,v,meta in [(k1,s_lav,"Lavagens no Mês",total_lav,meta_lav),(k2,s_rec,"Receita Lavagens",f"R$ {receita_lav::,.2f}",f"R$ {meta_rec::,.0f}"),(k3,s_mens,"Mensalistas Ativos",mens_ativos,meta_mens),(k4,s_tick,"Ticket Médio",f"R$ {ticket_medio::,.2f}",f"R$ {meta_ticket::,.0f}")]:
+        for c,s,t,v,meta in [(k1,s_lav,"Lavagens no Mês",total_lav,meta_lav),(k2,s_rec,"Receita Lavagens",f"R$ {receita_lav:,.2f}",f"R$ {meta_rec:,.0f}"),(k3,s_mens,"Mensalistas Ativos",mens_ativos,meta_mens),(k4,s_tick,"Ticket Médio",f"R$ {ticket_medio:,.2f}",f"R$ {meta_ticket:,.0f}")]:
             c.markdown(f"""<div class="card-executivo {s}"><div class="kpi-label">{t}</div><div class="kpi-value">{v}</div><div class="kpi-meta">Meta: {meta}</div><div class="semaforo {s}">{s.upper()}</div></div>""", unsafe_allow_html=True)
 
         st.markdown("---")
@@ -476,11 +476,11 @@ with tab3:
         with ct:
             if not ranking.empty:
                 rd = ranking.copy()
-                rd['Receita'] = rd['Receita'].apply(lambda v: f"R$ {v::,.2f}".replace(",","X").replace(".",",").replace("X","."))
+                rd['Receita'] = rd['Receita'].apply(lambda v: f"R$ {v:,.2f}".replace(",","X").replace(".",",").replace("X","."))
                 rd.columns = ['Serviço','Lavagens','Receita']
                 st.dataframe(rd, use_container_width=True, hide_index=True)
                 melhor = ranking.iloc[0]
-                st.markdown(f"""<div style="background:#eff6ff;border-radius:10px;padding:1rem;margin-top:0.5rem;"><span class="tag destaque">DESTAQUE</span><p style="margin:0.5rem 0 0 0;font-weight:600;">🏆 {melhor['servico']}</p><p style="margin:0;color:#6b7280;font-size:0.85rem;">{melhor['Lavagens']} lavagens — R$ {melhor['Receita']::,.2f}</p></div>""", unsafe_allow_html=True)
+                st.markdown(f"""<div style="background:#eff6ff;border-radius:10px;padding:1rem;margin-top:0.5rem;"><span class="tag destaque">DESTAQUE</span><p style="margin:0.5rem 0 0 0;font-weight:600;">🏆 {melhor['servico']}</p><p style="margin:0;color:#6b7280;font-size:0.85rem;">{melhor['Lavagens']} lavagens — R$ {melhor['Receita']:,.2f}</p></div>""", unsafe_allow_html=True)
 
         st.markdown("---")
         st.markdown("#### 📈 Evolução Mensal")
@@ -497,7 +497,7 @@ with tab3:
                 fig3.add_trace(go.Scatter(x=rec_mes['mes'], y=rec_mes['valor'], mode='lines+markers', name='Receita (R$)', line=dict(color='#f59e0b',width=3), marker=dict(size=8), yaxis='y2'))
                 if len(rec_mes)>0:
                     media = rec_mes['valor'].mean()
-                    fig3.add_hline(y=media, line_dash="dash", line_color="#f59e0b", opacity=0.5, annotation_text=f"Média: R$ {media::,.0f}", annotation_position="bottom right")
+                    fig3.add_hline(y=media, line_dash="dash", line_color="#f59e0b", opacity=0.5, annotation_text=f"Média: R$ {media:,.0f}", annotation_position="bottom right")
                 fig3.update_layout(height=350, barmode='stack', margin=dict(l=10,r=10,t=30,b=30), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(family="Inter",size=12), yaxis=dict(title="Lavagens",showgrid=True,gridcolor='#f3f4f6'), yaxis2=dict(title="Receita (R$)",overlaying='y',side='right',showgrid=False), hovermode='x unified')
                 st.plotly_chart(fig3, use_container_width=True)
         with col_res:
@@ -509,7 +509,7 @@ with tab3:
                     ant = res.iloc[i-1]['Receita']
                     atu = res.iloc[i]['Receita']
                     if ant>0: res.loc[res.index[i],'Dif.'] = ((atu-ant)/ant)*100
-                res['Rec.'] = res['Receita'].apply(lambda v: f"R$ {v::,.2f}".replace(",","X").replace(".",",").replace("X","."))
+                res['Rec.'] = res['Receita'].apply(lambda v: f"R$ {v:,.2f}".replace(",","X").replace(".",",").replace("X","."))
                 def fd(v):
                     if v>0: return f"🟢 +{float(v):.1f}%"
                     elif v<0: return f"🔴 {float(v):.1f}%"
@@ -523,7 +523,7 @@ with tab3:
                 st.markdown(th, unsafe_allow_html=True)
                 media_val = res['Receita'].mean()
                 melhor = res.loc[res['Receita'].idxmax()]
-                st.markdown(f"""<div style="background:#f0fdf4;border-radius:10px;padding:0.8rem;margin-top:0.8rem;"><p style="margin:0;color:#6b7280;font-size:0.75rem;">📊 Média Mensal</p><p style="margin:0;font-size:1.3rem;font-weight:800;color:#111827;">R$ {media_val::,.2f}</p><p style="margin:0;color:#6b7280;font-size:0.75rem;margin-top:0.5rem;">🏆 Melhor Mês</p><p style="margin:0;font-size:1rem;font-weight:700;color:#059669;">{melhor['Mês']} — R$ {float(melhor['Receita']):,.2f}</p><p style="margin:0;color:#6b7280;font-size:0.75rem;margin-top:0.5rem;">📅 Total: {res['Lavagens'].sum()} lavagens no ano</p></div>""", unsafe_allow_html=True)
+                st.markdown(f"""<div style="background:#f0fdf4;border-radius:10px;padding:0.8rem;margin-top:0.8rem;"><p style="margin:0;color:#6b7280;font-size:0.75rem;">📊 Média Mensal</p><p style="margin:0;font-size:1.3rem;font-weight:800;color:#111827;">R$ {media_val:,.2f}</p><p style="margin:0;color:#6b7280;font-size:0.75rem;margin-top:0.5rem;">🏆 Melhor Mês</p><p style="margin:0;font-size:1rem;font-weight:700;color:#059669;">{melhor['Mês']} — R$ {float(melhor['Receita']):,.2f}</p><p style="margin:0;color:#6b7280;font-size:0.75rem;margin-top:0.5rem;">📅 Total: {res['Lavagens'].sum()} lavagens no ano</p></div>""", unsafe_allow_html=True)
 
         st.markdown("---")
         st.markdown("#### 💡 Insights Executivos")
