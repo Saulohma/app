@@ -380,38 +380,39 @@ with tab2:
             mk1, mk2, mk3, mk4 = st.columns(4)
             mk1.metric("Total", total); mk2.metric("Ativos", ativos); mk3.metric("Inativos", inativos)
             mk4.metric("Receita Mensal", f"R${float(receita_mensal):,.0f}".replace(",","X").replace(".",",").replace("X","."))
-            st.markdown("---")
-            df_mens['valor_plano'] = pd.to_numeric(df_mens['valor_plano'], errors='coerce').fillna(0)
-            for _, row in df_mens.iterrows():
-                sc = "ativo" if row['ativo'] else "inativo"
-                stxt = "🟢 Ativo" if row['ativo'] else "🔴 Inativo"
-                st.markdown(f"""<div class="card-mensalista {sc}"><div style="display:flex;justify-content:space-between;align-items:start;"><div><div class="nome">{row['nome']}</div><div class="info">📞 {row['telefone'] or '—'}</div><div class="info">🚗 {row['tipo']} | {row['placa'] or '—'}</div><div class="info">📋 {row['plano']} — R$ {row['valor_plano']:.2f}</div><div class="info">📅 Início: {row['data_inicio'] or '—'}</div><div style="margin-top:6px;">{stxt}</div></div></div></div>""", unsafe_allow_html=True)
-                c1, c2, c3 = st.columns([1,1,1])
-                with c1:
-                    if st.button("🔄 Ativar/Desativar", key=f"t_{row['id']}", use_container_width=True):
-                        toggle_mensalista(row['id']); st.rerun()
-                with c2:
-                    if st.button("✏️ Editar", key=f"e_{row['id']}", use_container_width=True):
-                        st.session_state[f'ed_{row["id"]}'] = True
-                with c3:
-                    if st.button("🗑️ Excluir", key=f"d_{row['id']}", use_container_width=True):
-                        excluir_mensalista(row['id']); st.rerun()
-                if st.session_state.get(f'ed_{row["id"]}', False):
-                    with st.form(f"ef_{row['id']}"):
-                        en = st.text_input("Nome", value=row['nome'], key=f"en_{row['id']}")
-                        et = st.text_input("Telefone", value=row['telefone'], key=f"et_{row['id']}")
-                        etp = st.selectbox("Tipo", ["Comum","SUV","Caminhonete","Moto"], index=["Comum","SUV","Caminhonete","Moto"].index(row['tipo']) if row['tipo'] in ["Comum","SUV","Caminhonete","Moto"] else 0, key=f"etp_{row['id']}")
-                        ep = st.text_input("Placa", value=row['placa'], key=f"ep_{row['id']}")
-                        epl = st.selectbox("Plano", ["Valor Fixo Mensal","Pacote de Lavagens"], index=0 if row['plano']=="Valor Fixo Mensal" else 1, key=f"epl_{row['id']}")
-                        ev = st.number_input("Valor", value=float(row['valor_plano']), key=f"ev_{row['id']}")
-                        ed = st.date_input("Data", value=datetime.strptime(row['data_inicio'],"%Y-%m-%d").date() if row['data_inicio'] else date.today(), key=f"ed_{row['id']}")
-                        ea = st.checkbox("Ativo", value=bool(row['ativo']), key=f"ea_{row['id']}")
-                        if st.form_submit_button("💾 Salvar", use_container_width=True):
-                            atualizar_mensalista(row['id'], en, et, etp, ep, epl, ev, ed.strftime("%Y-%m-%d"), 1 if ea else 0)
-                            st.session_state[f'ed_{row["id"]}'] = False; st.rerun()
-                st.markdown("---")
-        else:
-            st.info("Nenhum mensalista cadastrado.")
+    st.markdown("---")
+    df_mens['valor_plano'] = pd.to_numeric(df_mens['valor_plano'], errors='coerce').fillna(0)
+    df_mens = df_mens.reset_index(drop=True)
+    for idx, row in df_mens.iterrows():
+        sc = "ativo" if row['ativo'] else "inativo"
+        stxt = "🟢 Ativo" if row['ativo'] else "🔴 Inativo"
+        st.markdown(f"""<div class="card-mensalista {sc}"><div style="display:flex;justify-content:space-between;align-items:start;"><div><div class="nome">{row['nome']}</div><div class="info">📞 {row['telefone'] or '—'}</div><div class="info">🚗 {row['tipo']} | {row['placa'] or '—'}</div><div class="info">📋 {row['plano']} — R$ {row['valor_plano']:.2f}</div><div class="info">📅 Início: {row['data_inicio'] or '—'}</div><div style="margin-top:6px;">{stxt}</div></div></div></div>""", unsafe_allow_html=True)
+        c1, c2, c3 = st.columns([1,1,1])
+        with c1:
+            if st.button("🔄 Ativar/Desativar", key=f"t_{idx}", use_container_width=True):
+                toggle_mensalista(row['id']); st.rerun()
+        with c2:
+            if st.button("✏️ Editar", key=f"e_{idx}", use_container_width=True):
+                st.session_state[f'ed_{idx}'] = True
+        with c3:
+            if st.button("🗑️ Excluir", key=f"d_{idx}", use_container_width=True):
+                excluir_mensalista(row['id']); st.rerun()
+        if st.session_state.get(f'ed_{idx}', False):
+            with st.form(f"ef_{idx}"):
+                en = st.text_input("Nome", value=row['nome'], key=f"en_{idx}")
+                et = st.text_input("Telefone", value=row['telefone'], key=f"et_{idx}")
+                etp = st.selectbox("Tipo", ["Comum","SUV","Caminhonete","Moto"], index=["Comum","SUV","Caminhonete","Moto"].index(row['tipo']) if row['tipo'] in ["Comum","SUV","Caminhonete","Moto"] else 0, key=f"etp_{idx}")
+                ep = st.text_input("Placa", value=row['placa'], key=f"ep_{idx}")
+                epl = st.selectbox("Plano", ["Valor Fixo Mensal","Pacote de Lavagens"], index=0 if row['plano']=="Valor Fixo Mensal" else 1, key=f"epl_{idx}")
+                ev = st.number_input("Valor", value=float(row['valor_plano']), key=f"ev_{idx}")
+                ed = st.date_input("Data", value=datetime.strptime(row['data_inicio'],"%Y-%m-%d").date() if row['data_inicio'] else date.today(), key=f"ed_{idx}")
+                ea = st.checkbox("Ativo", value=bool(row['ativo']), key=f"ea_{idx}")
+                if st.form_submit_button("💾 Salvar", use_container_width=True):
+                    atualizar_mensalista(row['id'], en, et, etp, ep, epl, ev, ed.strftime("%Y-%m-%d"), 1 if ea else 0)
+                    st.session_state[f'ed_{idx}'] = False; st.rerun()
+        st.markdown("---")
+    else:
+        st.info("Nenhum mensalista cadastrado.")
 
 # -------- ABA 3: ANÁLISES EXECUTIVAS --------
 with tab3:
