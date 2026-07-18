@@ -670,14 +670,11 @@ with tab2:
 with tab3:
     st.markdown("#### 📊 Análises Executivas")
     df_lav = carregar_lavagens()
-    # DEBUG: mostra dados crus do banco
-    st.write("🔍 DEBUG - Dados crus do banco:")
-    st.write(f"Total de registros: {len(df_lav)}")
-    if not df_lav.empty:
-        st.dataframe(df_lav[['id','data','cliente','servico','valor']].head(10))
     df_mens = carregar_mensalistas()
 
-    # Valores padrão ANTES de qualquer IF
+    # Valores padrão
+    if 'refresh_key' not in st.session_state:
+        st.session_state.refresh_key = 0
     mes_sel = None
     ano_sel = None
     serv_sel = "Todos"
@@ -688,11 +685,7 @@ with tab3:
 
     if not df_lav.empty:
         df_lav['data'] = pd.to_datetime(df_lav['data'], errors='coerce')
-        st.write(f"🔍 DEBUG - Após conversão de data: {len(df_lav)} registros")
-        st.write(f"Registros com data inválida (NaT): {df_lav['data'].isna().sum()}")
         df_lav = df_lav.dropna(subset=['data']).reset_index(drop=True)
-        st.write(f"🔍 DEBUG - Após dropna: {len(df_lav)} registros")
-                
         if not df_lav.empty:
             df_lav['mes'] = df_lav['data'].dt.month
             df_lav['ano'] = df_lav['data'].dt.year
@@ -701,7 +694,6 @@ with tab3:
 
             anos_disp = sorted(df_lav['ano'].unique(), reverse=True)
             meses_disp = sorted(int(m) for m in df_lav['mes'].unique() if pd.notna(m))
-            
             flt1, flt2, flt3 = st.columns(3)
             with flt1:
                 ano_sel = st.selectbox("Ano", anos_disp, key="as")
@@ -715,7 +707,6 @@ with tab3:
                 servs = sorted(df_lav['servico'].unique())
                 serv_sel = st.selectbox("Serviço", ["Todos"] + servs, key="ss")
 
-            # FILTROS - tudo DENTRO do bloco interno
             if mes_sel is not None:
                 df_filtro = df_lav[(df_lav['ano'] == ano_sel) & (df_lav['mes'] == int(mes_sel))]
             else:
@@ -724,14 +715,15 @@ with tab3:
                 df_filtro = df_filtro[df_filtro['servico'] == serv_sel]
 
             total_lav = len(df_filtro)
-            receita_lav = df_filtro['valor'].sum() if total_lav > 0 else 0
-            ticket_medio = receita_lav / total_lav if total_lav > 0 else 0
+            receita_lav = float(df_filtro['valor'].sum()) if total_lav > 0 else 0
+            qtd_total_lav = int(df_filtro['quantidade'].sum()) if 'quantidade' in df_filtro.columns and total_lav > 0 else total_lav
+            ticket_medio = receita_lav / qtd_total_lav if qtd_total_lav > 0 else 0
         else:
             st.info("Nenhuma lavagem com data válida.")
     else:
         st.info("Nenhuma lavagem registrada ainda.")
 
-    # --- KPIs (executa SEMPRE) ---
+    # --- KPIs ---
     mens_ativos = len(df_mens[df_mens['ativo'] == 1]) if not df_mens.empty else 0
     meta_lav = 20; meta_rec = 3000; meta_mens = 3; meta_ticket = 120
 
@@ -756,222 +748,53 @@ with tab3:
 
     st.markdown("---")
 
-    # GRÁFICO - só se tiver dados
+    # --- GRÁFICOS (só se tiver dados) ---
     if not df_filtro.empty and 'data' in df_filtro.columns:
-        try:
-            df_dia = df_filtro.groupby(df_filtro['data'].dt.strftime('%d/%m')).agg({'valor': 'sum', 'cliente': 'count'}).reset_index().rename(columns={'cliente': 'qtd', 'valor': 'receita'})
-            st.markdown("##### 📈 Receita Diária")
-            st.line_chart(df_dia.set_index('data')['receita'])
-        except:
-            pass
+        col1, col2 = st.columns(2)
 
-    st.markdown("---")
-    st.markdown("##### 📋 Últimas Lavagens")
-    if not df_filtro.empty:
-        cols = [c for c in ['data', 'cliente', 'tipo_veiculo', 'servico', 'valor', 'placa', 'quantidade'] if c in df_filtro.columns]
-        st.dataframe(df_filtro[cols].head(20), use_container_width=True, hide_index=True)
-    else:
-        st.info("Nenhuma lavagem para exibir.")
-
-    # --- KPIs (executa sempre, mesmo vazio) ---
-    mens_ativos = len(df_mens[df_mens['ativo'] == 1]) if not df_mens.empty else 0
-    meta_lav = 20; meta_rec = 3000; meta_mens = 3; meta_ticket = 120
-
-    def sf(v, m):
-        if v >= m: return "verde"
-        elif v >= m * 0.7: return "amarelo"
-        else: return "vermelho"
-
-    s_lav = sf(total_lav, meta_lav)
-    s_rec = sf(receita_lav, meta_rec)
-    s_mens = sf(mens_ativos, meta_mens)
-    s_tick = sf(ticket_medio, meta_ticket)
-
-    k1, k2, k3, k4 = st.columns(4)
-    for c, s, t, v, meta in [
-        (k1, s_lav, "Lavagens no Mês", total_lav, meta_lav),
-        (k2, s_rec, "Receita Lavagens", f"R$ {receita_lav:,.2f}", f"R$ {meta_rec:,.0f}"),
-        (k3, s_mens, "Mensalistas Ativos", mens_ativos, meta_mens),
-        (k4, s_tick, "Ticket Médio", f"R$ {ticket_medio:,.2f}", f"R$ {meta_ticket:,.0f}")
-    ]:
-        c.markdown(f"""<div class="card-executivo {s}"><div class="kpi-label">{t}</div><div class="kpi-value">{v}</div><div class="kpi-meta">Meta: {meta}</div><div class="semaforo {s}">{s.upper()}</div></div>""", unsafe_allow_html=True)
-
-    st.markdown("---")
-
-    # --- GRÁFICO (só se tiver dados filtrados) ---
-    if not df_filtro.empty and 'data' in df_filtro.columns:
-        try:
-            df_dia = df_filtro.groupby(df_filtro['data'].dt.strftime('%d/%m')).agg({'valor': 'sum', 'cliente': 'count'}).reset_index().rename(columns={'cliente': 'qtd', 'valor': 'receita'})
-            st.markdown("##### 📈 Receita Diária")
-            st.line_chart(df_dia.set_index('data')['receita'])
-        except:
-            pass
-
-    st.markdown("---")
-    st.markdown("##### 📋 Últimas Lavagens")
-    if not df_filtro.empty:
-        cols = [c for c in ['data', 'cliente', 'tipo_veiculo', 'servico', 'valor', 'placa', 'quantidade'] if c in df_filtro.columns]
-        st.dataframe(df_filtro[cols].head(20), use_container_width=True, hide_index=True)
-    else:
-        st.info("Nenhuma lavagem para exibir.")
-
-
-    # Filtro seguro — sempre gera df_filtro
-    if mes_sel is not None:
-        df_filtro = df_lav[(df_lav['ano']==ano_sel)&(df_lav['mes']==int(mes_sel))]
-    else:
-        df_filtro = df_lav.copy()
-
-    if serv_sel!="Todos":
-        df_filtro = df_filtro[df_filtro['servico']==serv_sel]
-
-        total_lav = len(df_filtro)
-        receita_lav = df_filtro['valor'].sum() if total_lav>0 else 0
-        ticket_medio = receita_lav/total_lav if total_lav>0 else 0
-        mens_ativos = len(df_mens[df_mens['ativo']==1]) if not df_mens.empty else 0
-        k1,k2,k3,k4 = st.columns(4)
-        for c,s,t,v,meta in [(k1,s_lav,"Lavagens no Mês",total_lav,meta_lav),(k2,s_rec,"Receita Lavagens",f"R$ {receita_lav:,.2f}",f"R$ {meta_rec:,.0f}"),(k3,s_mens,"Mensalistas Ativos",mens_ativos,meta_mens),(k4,s_tick,"Ticket Médio",f"R$ {ticket_medio:,.2f}",f"R$ {meta_ticket:,.0f}")]:
-            c.markdown(f"""<div class="card-executivo {s}"><div class="kpi-label">{t}</div><div class="kpi-value">{v}</div><div class="kpi-meta">Meta: {meta}</div><div class="semaforo {s}">{s.upper()}</div></div>""", unsafe_allow_html=True)
-
-        st.markdown("---")
-        st.markdown("#### 📅 Lavagens por Dia da Semana")
-        df_sem = df_filtro.copy()
-        df_sem['dia_ordem'] = df_sem['data'].dt.dayofweek
-        df_sem = df_sem[df_sem['dia_ordem']<=5]
-        if not df_sem.empty:
-            agg = df_sem.groupby(['dia_ordem','servico']).agg(Lavagens=('id','count'),Receita=('valor','sum')).reset_index()
-            agg['dia_nome'] = agg['dia_ordem'].map({0:'Seg',1:'Ter',2:'Qua',3:'Qui',4:'Sex',5:'Sáb'})
-            fig1 = px.bar(agg, x='dia_nome', y='Lavagens', color='servico', title="Lavagens por Dia da Semana", color_discrete_sequence=px.colors.qualitative.Bold, category_orders={'dia_nome':['Seg','Ter','Qua','Qui','Sex','Sáb']}, text='Lavagens')
-            fig1.update_layout(height=350, margin=dict(l=10,r=10,t=40,b=30), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(family="Inter",size=12))
-            fig1.update_traces(textposition='outside', textfont=dict(family="Arial Black",size=11))
-            fig1.update_xaxes(title=None, showgrid=False); fig1.update_yaxes(title="Lavagens", showgrid=True, gridcolor='#f3f4f6')
-            st.plotly_chart(fig1, use_container_width=True)
-
-        st.markdown("---")
-        st.markdown("#### 🏆 Ranking de Serviços")
-        cg, ct = st.columns([1.5,1])
-        ranking = df_filtro.groupby('servico').agg(Lavagens=('id','count'),Receita=('valor','sum')).reset_index().sort_values('Lavagens',ascending=False)
-        with cg:
-            if not ranking.empty:
-                fig2 = px.bar(ranking, x='servico', y='Lavagens', color='servico', color_discrete_sequence=px.colors.qualitative.Bold, title="Serviços mais realizados", text='Lavagens')
-                fig2.update_layout(height=300, showlegend=False, margin=dict(l=10,r=10,t=40,b=30), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(family="Inter",size=12))
-                fig2.update_traces(textposition='outside', textfont=dict(family="Arial Black",size=12))
-                fig2.update_xaxes(title=None); fig2.update_yaxes(showgrid=True,gridcolor='#f3f4f6')
-                st.plotly_chart(fig2, use_container_width=True)
-        with ct:
-            if not ranking.empty:
-                rd = ranking.copy()
-                rd['Receita'] = rd['Receita'].apply(lambda v: f"R$ {v:,.2f}".replace(",","X").replace(".",",").replace("X","."))
-                rd.columns = ['Serviço','Lavagens','Receita']
-                st.dataframe(rd, use_container_width=True, hide_index=True)
-                melhor = ranking.iloc[0]
-                st.markdown(f"""<div style="background:#eff6ff;border-radius:10px;padding:1rem;margin-top:0.5rem;"><span class="tag destaque">DESTAQUE</span><p style="margin:0.5rem 0 0 0;font-weight:600;">🏆 {melhor['servico']}</p><p style="margin:0;color:#6b7280;font-size:0.85rem;">{melhor['Lavagens']} lavagens — R$ {melhor['Receita']:,.2f}</p></div>""", unsafe_allow_html=True)
-
-        st.markdown("---")
-        st.markdown("#### 📈 Evolução Mensal")
-        col_graf, col_res = st.columns([2,1])
-        with col_graf:
-            df_ano = df_lav[df_lav['ano']==ano_sel].copy()
-            if not df_ano.empty:
-                evol = df_ano.groupby(['mes','servico']).agg(Lavagens=('id','count'),Receita=('valor','sum')).reset_index()
-                rec_mes = df_ano.groupby('mes')['valor'].sum().reset_index()
-                fig3 = go.Figure()
-                for s in evol['servico'].unique():
-                    ds = evol[evol['servico']==s]
-                    fig3.add_trace(go.Bar(name=s, x=ds['mes'], y=ds['Lavagens'], text=ds['Lavagens'], textposition='outside'))
-                fig3.add_trace(go.Scatter(x=rec_mes['mes'], y=rec_mes['valor'], mode='lines+markers', name='Receita (R$)', line=dict(color='#f59e0b',width=3), marker=dict(size=8), yaxis='y2'))
-                if len(rec_mes)>0:
-                    media = rec_mes['valor'].mean()
-                    fig3.add_hline(y=media, line_dash="dash", line_color="#f59e0b", opacity=0.5, annotation_text=f"Média: R$ {media:,.0f}", annotation_position="bottom right")
-                fig3.update_layout(height=350, barmode='stack', margin=dict(l=10,r=10,t=30,b=30), legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), plot_bgcolor='rgba(0,0,0,0)', paper_bgcolor='rgba(0,0,0,0)', font=dict(family="Inter",size=12), yaxis=dict(title="Lavagens",showgrid=True,gridcolor='#f3f4f6'), yaxis2=dict(title="Receita (R$)",overlaying='y',side='right',showgrid=False), hovermode='x unified')
-                st.plotly_chart(fig3, use_container_width=True)
-        with col_res:
-            if not df_ano.empty:
-                res = df_ano.groupby('mes').agg(Lavagens=('id','count'),Receita=('valor','sum')).reset_index()
-                res['Mês'] = res['mes'].apply(lambda m: datetime(2000,int(m),1).strftime('%b'))
-                res['Dif.'] = 0.0
-                for i in range(1,len(res)):
-                    ant = res.iloc[i-1]['Receita']
-                    atu = res.iloc[i]['Receita']
-                    if ant>0: res.loc[res.index[i],'Dif.'] = ((atu-ant)/ant)*100
-                res['Rec.'] = res['Receita'].apply(lambda v: f"R$ {v:,.2f}".replace(",","X").replace(".",",").replace("X","."))
-                def fd(v):
-                    if v>0: return f"🟢 +{float(v):.1f}%"
-                    elif v<0: return f"🔴 {float(v):.1f}%"
-                    else: return "—"
-                res['Dif.'] = res['Dif.'].apply(fd)
-                th = "<table style='width:100%;border-collapse:collapse;font-size:0.8rem;'><thead><tr style='background:#1e3a5f;color:white;'><th style='padding:6px 8px;text-align:left;'>Mês</th><th style='padding:6px 8px;text-align:center;'>Lav.</th><th style='padding:6px 8px;text-align:right;'>Receita</th><th style='padding:6px 8px;text-align:center;'>Dif.</th></tr></thead><tbody>"
-                for _, r in res.iterrows():
-                    th += f"<tr style='border-bottom:1px solid #f3f4f6;'><td style='padding:6px 8px;font-weight:600;'>{r['Mês']}</td><td style='padding:6px 8px;text-align:center;'>{r['Lavagens']}</td><td style='padding:6px 8px;text-align:right;'>{r['Rec.']}</td><td style='padding:6px 8px;text-align:center;'>{r['Dif.']}</td></tr>"
-                th += "</tbody></table>"
-                st.markdown("#### 📋 Resumo Mensal")
-                st.markdown(th, unsafe_allow_html=True)
-                media_val = res['Receita'].mean()
-                melhor = res.loc[res['Receita'].idxmax()]
-                st.markdown(f"""<div style="background:#f0fdf4;border-radius:10px;padding:0.8rem;margin-top:0.8rem;"><p style="margin:0;color:#6b7280;font-size:0.75rem;">📊 Média Mensal</p><p style="margin:0;font-size:1.3rem;font-weight:800;color:#111827;">R$ {media_val:,.2f}</p><p style="margin:0;color:#6b7280;font-size:0.75rem;margin-top:0.5rem;">🏆 Melhor Mês</p><p style="margin:0;font-size:1rem;font-weight:700;color:#059669;">{melhor['Mês']} — R$ {float(melhor['Receita']):,.2f}</p><p style="margin:0;color:#6b7280;font-size:0.75rem;margin-top:0.5rem;">📅 Total: {res['Lavagens'].sum()} lavagens no ano</p></div>""", unsafe_allow_html=True)
-
-        st.markdown("---")
-        st.markdown("#### 💡 Insights Executivos")
-        insights = []
-        if total_lav<meta_lav:
-            insights.append(("atencao",f"📉 Lavagens abaixo da meta: {total_lav}/{meta_lav} no mês. Considere ações de marketing."))
-        elif total_lav>=meta_lav*1.5:
-            insights.append(("destaque",f"🔥 Lavagens muito acima da meta! {total_lav} no mês. Ótimo desempenho!"))
-        else:
-            insights.append(("oportunidade",f"✅ Meta de lavagens atingida: {total_lav}/{meta_lav}. Busque superar!"))
-        if ticket_medio<meta_ticket:
-            insights.append(("risco",f"💸 Ticket médio baixo: R$ {float(ticket_medio):.2f}. Ofereça serviços adicionais."))
-        else:
-            insights.append(("destaque",f"💰 Ticket médio saudável: R$ {float(ticket_medio):.2f}. Continue assim!"))
-        if mens_ativos<meta_mens:
-            insights.append(("atencao",f"👥 Poucos mensalistas ativos: {mens_ativos}/{meta_mens}. Crie promoções de fidelidade."))
-        else:
-            insights.append(("oportunidade",f"👥 Mensalistas ativos: {mens_ativos}. Base sólida!"))
-        if not ranking.empty:
-            insights.append(("destaque",f"🏆 Serviço mais popular: {ranking.iloc[0]['servico']} ({ranking.iloc[0]['Lavagens']} lavagens)."))
-        if len(rec_mes)>=2:
-            ultimos = rec_mes.sort_values('mes').tail(2)
-            if len(ultimos)==2:
-                var = ((ultimos.iloc[1]['valor']-ultimos.iloc[0]['valor'])/ultimos.iloc[0]['valor'])*100
-                if var>10: insights.append(("destaque",f"📈 Faturamento cresceu {float(var):.1f}% em relação ao mês anterior!"))
-                elif var<-10: insights.append(("risco",f"📉 Faturamento caiu {float(abs(var)):.1f}%. Atenção!"))
-                else: insights.append(("oportunidade",f"📊 Faturamento estável ({var:+.1f}%). Busque crescimento."))
-        for t, txt in insights:
-            st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;box-shadow:0 1px 3px rgba(0,0,0,0.06);margin-bottom:0.5rem;display:flex;align-items:center;gap:0.5rem;"><span class="tag {t}">{t.upper()}</span><span style="color:#374151;font-size:0.95rem;">{txt}</span></div>""", unsafe_allow_html=True)
-    else:
-        st.info("💡 Nenhum dado de lavagem ainda. Registre lavagens para ver as análises.")
-
-    # ---- RESETAR BANCO (sempre visível na tab3) ----
-    st.markdown("---")
-    with st.expander("⚠️ **Administrador — Resetar Banco de Dados**"):
-        col1, col2 = st.columns([1, 1])
         with col1:
-            senha_reset = st.text_input("Digite a senha de administrador para resetar:", type="password", key="senha_reset")
-        with col2:
-            st.markdown("###  ")
-            st.markdown("###  ")
-            if st.button("🗑️ Resetar TODOS os dados", type="primary", use_container_width=True):
-                if senha_reset == "admin757":
-                    st.warning("⚠️ **ATENÇÃO!** Isso vai apagar TODAS as lavagens e mensalistas!")
-                    col_confirm, _ = st.columns([1, 3])
-                    with col_confirm:
-                        if st.button("✅ CONFIRMAR RESET", type="primary", use_container_width=True):
-                            try:
-                                conn = get_conn()
-                                with conn.cursor() as cur:
-                                    cur.execute("DELETE FROM lavagens")
-                                    cur.execute("DELETE FROM mensalistas")
-                                conn.commit()
-                                conn.close()
-                                st.success("✅ Banco resetado com sucesso! Todos os dados foram apagados.")
-                                st.cache_data.clear()
-                                st.rerun()
-                            except Exception as e:
-                                st.error(f"Erro ao resetar: {e}")
-                elif senha_reset:
-                    st.error("❌ Senha incorreta!")
+            # 📈 Receita Diária
+            st.markdown("##### 📈 Receita Diária")
+            df_dia = df_filtro.groupby(df_filtro['data'].dt.strftime('%d/%m')).agg({'valor': 'sum', 'quantidade': 'sum'}).reset_index()
+            if not df_dia.empty:
+                st.line_chart(df_dia.set_index('data')['valor'], use_container_width=True)
 
-st.markdown(f"""<div style="text-align:center;color:#9ca3af;font-size:0.8rem;">🚗 Lava Jato Dashboard v2.0 · {datetime.now().strftime('%d/%m/%Y %H:%M')}</div>""", unsafe_allow_html=True)
+        with col2:
+            # 🏆 Ranking de Serviços
+            st.markdown("##### 🏆 Ranking de Serviços")
+            df_serv = df_filtro.groupby('servico').agg({'quantidade': 'sum', 'valor': 'sum'}).reset_index().sort_values('quantidade', ascending=False)
+            if not df_serv.empty:
+                st.bar_chart(df_serv.set_index('servico')['quantidade'], use_container_width=True)
+
+        st.markdown("---")
+
+        col3, col4 = st.columns(2)
+
+        with col3:
+            # 🚗 Quantidade por Tipo de Veículo
+            st.markdown("##### 🚗 Lavagens por Tipo")
+            df_tipo = df_filtro.groupby('tipo_veiculo').agg({'quantidade': 'sum', 'valor': 'sum'}).reset_index().sort_values('quantidade', ascending=False)
+            if not df_tipo.empty:
+                st.bar_chart(df_tipo.set_index('tipo_veiculo')['quantidade'], use_container_width=True)
+
+        with col4:
+            # 💰 Receita por Tipo
+            st.markdown("##### 💰 Receita por Tipo")
+            if not df_tipo.empty:
+                st.bar_chart(df_tipo.set_index('tipo_veiculo')['valor'], use_container_width=True)
+
+        st.markdown("---")
+
+        # 📋 Últimas Lavagens
+        st.markdown("##### 📋 Últimas Lavagens")
+        cols = [c for c in ['data', 'cliente', 'tipo_veiculo', 'servico', 'quantidade', 'valor', 'placa'] if c in df_filtro.columns]
+        st.dataframe(df_filtro[cols].head(20), use_container_width=True, hide_index=True)
+
+        # Resumo
+        st.markdown(f"**Resumo: {total_lav} registros | {qtd_total_lav} itens lavados | R$ {receita_lav:,.2f} receita**")
+
+    else:
+        st.info("Nenhum dado para exibir nos gráficos.")
 
 # ============================================================
 # 📥 EXPORTAR RELATÓRIO
