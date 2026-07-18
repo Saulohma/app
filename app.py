@@ -363,7 +363,23 @@ def limpar_dados_corrompidos():
     conn.commit()
     conn.close()
 
-
+def get_preco(tipo_veiculo, servico):
+    """Retorna o valor do serviço para o tipo de veículo"""
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("SELECT valor FROM precos WHERE tipo_veiculo=%s AND servico=%s", (tipo_veiculo, servico))
+        r = cur.fetchone()
+    conn.close()
+    if r:
+        return float(r['valor'])
+    # Fallback: precos padrão
+    precos_fallback = {
+        ('Comum', 'Lavagem Simples'): 20, ('Comum', 'Lavagem Completa'): 35,
+        ('SUV', 'Lavagem Simples'): 30, ('SUV', 'Lavagem Completa'): 50,
+        ('Caminhonete', 'Lavagem Simples'): 35, ('Caminhonete', 'Lavagem Completa'): 55,
+        ('Moto', 'Lavagem Simples'): 15, ('Moto', 'Lavagem Completa'): 25,
+    }
+    return precos_fallback.get((tipo_veiculo, servico), 0)
 
 init_db()
 migrar_excel()
