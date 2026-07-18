@@ -10,22 +10,19 @@ from io import BytesIO
 import os
 import psycopg2
 from psycopg2.extras import RealDictCursor
+from hashlib import sha256
+
 # ============================================================
 # AUTENTICAÇÃO
 # ============================================================
-import os
-from hashlib import sha256
-
 ADMIN_USER = "admin"
 ADMIN_PASS = "admin757"
 
 def check_password():
     if "auth" not in st.session_state:
         st.session_state.auth = False
-    
     if st.session_state.auth:
         return True
-    
     st.markdown(
         "<div style='text-align:center;padding:3rem 0 1rem 0;'>"
         "<h1>🚗 Lava Jato</h1>"
@@ -33,7 +30,6 @@ def check_password():
         "</div>",
         unsafe_allow_html=True
     )
-    
     col1, col2, col3 = st.columns([1, 1.5, 1])
     with col2:
         st.markdown("#### 🔐 Acesso Restrito")
@@ -47,6 +43,7 @@ def check_password():
                 else:
                     st.error("❌ Usuário ou senha inválidos!")
     return False
+
 # ============================================================
 # CONFIG
 # ============================================================
@@ -128,12 +125,11 @@ def init_db():
         )
     conn.commit()
     conn.close()
-  
 
 def migrar_excel():
     conn = get_conn()
     cursor = conn.cursor()
-    cursor.execute("SELECT COUNT(*) FROM lavagens")
+    cursor.execute("SELECT COUNT(*) AS total FROM lavagens")
     if list(cursor.fetchone().values())[0] > 0:
         conn.close()
         return
@@ -156,7 +152,8 @@ def migrar_excel():
                 q = int(r.get('quantidade') or r.get('Quantidade') or 1)
                 cursor.execute("""INSERT INTO lavagens (data,tipo_veiculo,servico,valor,cliente,placa,quantidade) VALUES (%s,%s,%s,%s,%s,%s,%s)""", (d,t,s,v,c,p,q))
             conn.commit()
-        except: pass
+        except:
+            pass
     xlsxm = Path(__file__).parent / "mensalistas.xlsx"
     if xlsxm.exists():
         try:
@@ -177,7 +174,8 @@ def migrar_excel():
                 a = int(r.get('ativo') or r.get('Ativo') or 0)
                 cursor.execute("""INSERT INTO mensalistas (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""", (n,t,tp,p,pl,v,di,a))
             conn.commit()
-        except: pass
+        except:
+            pass
     conn.close()
 
 init_db()
@@ -190,7 +188,8 @@ def carregar_lavagens():
     conn = get_conn()
     df = pd.read_sql_query("SELECT * FROM lavagens ORDER BY id DESC", conn)
     conn.close()
-    if not df.empty: df['data'] = pd.to_datetime(df['data'], errors='coerce')
+    if not df.empty:
+        df['data'] = pd.to_datetime(df['data'], errors='coerce')
     return df
 
 def carregar_mensalistas():
@@ -219,8 +218,6 @@ def adicionar_mensalista(nome, telefone, tipo, placa, plano, valor_plano, data_i
     conn.commit()
     conn.close()
 
-
-
 def atualizar_mensalista(id, nome, telefone, tipo, placa, plano, valor_plano, data_inicio, ativo):
     conn = get_conn()
     conn.execute("""UPDATE mensalistas SET nome=%s,telefone=%s,tipo=%s,placa=%s,plano=%s,valor_plano=%s,data_inicio=%s,ativo=%s WHERE id=%s""", (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo,id))
@@ -242,7 +239,6 @@ def excluir_mensalista(id):
     conn.execute("DELETE FROM mensalistas WHERE id=%s", (id,))
     conn.commit()
     conn.close()
-
 
 # ============================================================
 # CSS
@@ -299,19 +295,18 @@ st.markdown("""
 col_logo, col_title = st.columns([1, 5])
 with col_logo:
     logo_path = Path(__file__).parent / "imagem" / "lj.jpeg"
-    if logo_path.exists(): st.image(str(logo_path), width=80)
-    else: st.markdown("## 🚗")
+    if logo_path.exists():
+        st.image(str(logo_path), width=80)
+    else:
+        st.markdown("## 🚗")
 with col_title:
     st.markdown("<h1 style='margin:0;'>Lava Jato</h1>", unsafe_allow_html=True)
     st.markdown("<p style='color:#6b7280;margin-top:-5px;'>Sistema de Gestão</p>", unsafe_allow_html=True)
-
 st.markdown("---")
 
-
-# Proteção de login
 if not check_password():
     st.stop()
-# =================
+
 # ============================================================
 # ABAS
 # ============================================================
@@ -324,11 +319,11 @@ with tab1:
         st.markdown("#### ✏️ Dados da Lavagem")
         tipo_veiculo = st.selectbox("Tipo de Veículo", ["Comum","SUV","Caminhonete","Moto"], key="tv")
         servicos_por_tipo = {
-        "Comum": ["Completa", "Simples", "Ducha", "Motor", "Chaci", "Moto"],
-        "SUV": ["Completa", "Simples", "Ducha", "Motor", "Chaci", "Moto"],
-        "Caminhonete": ["Completa", "Simples", "Ducha", "Motor", "Chaci", "Moto"],
-        "Moto": ["Moto"],
-         }
+            "Comum": ["Completa", "Simples", "Ducha", "Motor", "Chaci", "Moto"],
+            "SUV": ["Completa", "Simples", "Ducha", "Motor", "Chaci", "Moto"],
+            "Caminhonete": ["Completa", "Simples", "Ducha", "Motor", "Chaci", "Moto"],
+            "Moto": ["Moto"],
+        }
         servico = st.selectbox("Serviço", servicos_por_tipo[tipo_veiculo], key="sv")
         valor_base = get_preco(tipo_veiculo, servico)
         quantidade = st.number_input("Quantidade", min_value=1, value=1, step=1, key="qtd")
@@ -349,10 +344,9 @@ with tab1:
             exibir = df_lav[['data','cliente','tipo_veiculo','servico','valor','placa','quantidade']].head(10)
             exibir['data'] = exibir['data'].dt.strftime('%d/%m/%Y')
             total_valor = pd.to_numeric(df_lav['valor'], errors='coerce').sum()
-            exibir['valor'] = exibir['valor'].apply(lambda v: f"R$ {v:,.2f}".replace(",","X").replace(".",",").replace("X","."))
+            exibir['valor'] = pd.to_numeric(exibir['valor'], errors='coerce').apply(lambda v: f"R$ {v:,.2f}".replace(",","X").replace(".",",").replace("X","."))
             exibir.columns = ['Data','Cliente','Tipo','Serviço','Valor','Placa','Qtd']
             st.dataframe(exibir, use_container_width=True, hide_index=True)
-            total_valor = pd.to_numeric(df_lav['valor'], errors='coerce').sum()
             st.markdown(f"**Total:** {len(df_lav)} lavagens | **Valor total:** R$ {float(total_valor):,.2f}".replace(",","X").replace(".",",").replace("X","."))
         else:
             st.info("Nenhuma lavagem registrada ainda.")
@@ -375,7 +369,8 @@ with tab2:
                     adicionar_mensalista(nome_m, tel_m, tipo_m, placa_m, plano_m, valor_m, data_m.strftime("%Y-%m-%d"))
                     st.success(f"✅ {nome_m} cadastrado como INATIVO")
                     st.rerun()
-                else: st.warning("Nome é obrigatório")
+                else:
+                    st.warning("Nome é obrigatório")
     with col_lista:
         df_mens = carregar_mensalistas()
         st.markdown("#### 📋 Mensalistas")
@@ -414,7 +409,8 @@ with tab2:
                             atualizar_mensalista(row['id'], en, et, etp, ep, epl, ev, ed.strftime("%Y-%m-%d"), 1 if ea else 0)
                             st.session_state[f'ed_{row["id"]}'] = False; st.rerun()
                 st.markdown("---")
-        else: st.info("Nenhum mensalista cadastrado.")
+        else:
+            st.info("Nenhum mensalista cadastrado.")
 
 # -------- ABA 3: ANÁLISES EXECUTIVAS --------
 with tab3:
@@ -434,22 +430,25 @@ with tab3:
             servs = sorted(df_lav['servico'].unique())
             serv_sel = st.selectbox("Serviço", ["Todos"]+servs, key="ss")
         df_filtro = df_lav[(df_lav['ano']==ano_sel)&(df_lav['mes']==int(mes_sel))]
-        if serv_sel!="Todos": df_filtro = df_filtro[df_filtro['servico']==serv_sel]
+        if serv_sel!="Todos":
+            df_filtro = df_filtro[df_filtro['servico']==serv_sel]
         total_lav = len(df_filtro)
         receita_lav = df_filtro['valor'].sum()
         ticket_medio = receita_lav/total_lav if total_lav>0 else 0
         mens_ativos = len(df_mens[df_mens['ativo']==1]) if not df_mens.empty else 0
         meta_lav=20; meta_rec=3000; meta_mens=3; meta_ticket=120
+
         def sf(v,m):
             if v>=m: return "verde"
             elif v>=m*0.7: return "amarelo"
             else: return "vermelho"
+
         s_lav=sf(total_lav,meta_lav); s_rec=sf(receita_lav,meta_rec); s_mens=sf(mens_ativos,meta_mens); s_tick=sf(ticket_medio,meta_ticket)
         k1,k2,k3,k4 = st.columns(4)
         for c,s,t,v,meta in [(k1,s_lav,"Lavagens no Mês",total_lav,meta_lav),(k2,s_rec,"Receita Lavagens",f"R$ {receita_lav:,.2f}",f"R$ {meta_rec:,.0f}"),(k3,s_mens,"Mensalistas Ativos",mens_ativos,meta_mens),(k4,s_tick,"Ticket Médio",f"R$ {ticket_medio:,.2f}",f"R$ {meta_ticket:,.0f}")]:
             c.markdown(f"""<div class="card-executivo {s}"><div class="kpi-label">{t}</div><div class="kpi-value">{v}</div><div class="kpi-meta">Meta: {meta}</div><div class="semaforo {s}">{s.upper()}</div></div>""", unsafe_allow_html=True)
+
         st.markdown("---")
-        # Gráfico dias da semana
         st.markdown("#### 📅 Lavagens por Dia da Semana")
         df_sem = df_filtro.copy()
         df_sem['dia_ordem'] = df_sem['data'].dt.dayofweek
@@ -462,8 +461,8 @@ with tab3:
             fig1.update_traces(textposition='outside', textfont=dict(family="Arial Black",size=11))
             fig1.update_xaxes(title=None, showgrid=False); fig1.update_yaxes(title="Lavagens", showgrid=True, gridcolor='#f3f4f6')
             st.plotly_chart(fig1, use_container_width=True)
+
         st.markdown("---")
-        # Ranking de Serviços
         st.markdown("#### 🏆 Ranking de Serviços")
         cg, ct = st.columns([1.5,1])
         ranking = df_filtro.groupby('servico').agg(Lavagens=('id','count'),Receita=('valor','sum')).reset_index().sort_values('Lavagens',ascending=False)
@@ -482,8 +481,8 @@ with tab3:
                 st.dataframe(rd, use_container_width=True, hide_index=True)
                 melhor = ranking.iloc[0]
                 st.markdown(f"""<div style="background:#eff6ff;border-radius:10px;padding:1rem;margin-top:0.5rem;"><span class="tag destaque">DESTAQUE</span><p style="margin:0.5rem 0 0 0;font-weight:600;">🏆 {melhor['servico']}</p><p style="margin:0;color:#6b7280;font-size:0.85rem;">{melhor['Lavagens']} lavagens — R$ {melhor['Receita']:,.2f}</p></div>""", unsafe_allow_html=True)
+
         st.markdown("---")
-        # Evolução Mensal + Resumo
         st.markdown("#### 📈 Evolução Mensal")
         col_graf, col_res = st.columns([2,1])
         with col_graf:
@@ -525,17 +524,24 @@ with tab3:
                 media_val = res['Receita'].mean()
                 melhor = res.loc[res['Receita'].idxmax()]
                 st.markdown(f"""<div style="background:#f0fdf4;border-radius:10px;padding:0.8rem;margin-top:0.8rem;"><p style="margin:0;color:#6b7280;font-size:0.75rem;">📊 Média Mensal</p><p style="margin:0;font-size:1.3rem;font-weight:800;color:#111827;">R$ {media_val:,.2f}</p><p style="margin:0;color:#6b7280;font-size:0.75rem;margin-top:0.5rem;">🏆 Melhor Mês</p><p style="margin:0;font-size:1rem;font-weight:700;color:#059669;">{melhor['Mês']} — R$ {melhor['Receita']:,.2f}</p><p style="margin:0;color:#6b7280;font-size:0.75rem;margin-top:0.5rem;">📅 Total: {res['Lavagens'].sum()} lavagens no ano</p></div>""", unsafe_allow_html=True)
+
         st.markdown("---")
-        # Insights
         st.markdown("#### 💡 Insights Executivos")
         insights = []
-        if total_lav<meta_lav: insights.append(("atencao",f"📉 Lavagens abaixo da meta: {total_lav}/{meta_lav} no mês. Considere ações de marketing."))
-        elif total_lav>=meta_lav*1.5: insights.append(("destaque",f"🔥 Lavagens muito acima da meta! {total_lav} no mês. Ótimo desempenho!"))
-        else: insights.append(("oportunidade",f"✅ Meta de lavagens atingida: {total_lav}/{meta_lav}. Busque superar!"))
-        if ticket_medio<meta_ticket: insights.append(("risco",f"💸 Ticket médio baixo: R$ {ticket_medio:.2f}. Ofereça serviços adicionais."))
-        else: insights.append(("destaque",f"💰 Ticket médio saudável: R$ {ticket_medio:.2f}. Continue assim!"))
-        if mens_ativos<meta_mens: insights.append(("atencao",f"👥 Poucos mensalistas ativos: {mens_ativos}/{meta_mens}. Crie promoções de fidelidade."))
-        else: insights.append(("oportunidade",f"👥 Mensalistas ativos: {mens_ativos}. Base sólida!"))
+        if total_lav<meta_lav:
+            insights.append(("atencao",f"📉 Lavagens abaixo da meta: {total_lav}/{meta_lav} no mês. Considere ações de marketing."))
+        elif total_lav>=meta_lav*1.5:
+            insights.append(("destaque",f"🔥 Lavagens muito acima da meta! {total_lav} no mês. Ótimo desempenho!"))
+        else:
+            insights.append(("oportunidade",f"✅ Meta de lavagens atingida: {total_lav}/{meta_lav}. Busque superar!"))
+        if ticket_medio<meta_ticket:
+            insights.append(("risco",f"💸 Ticket médio baixo: R$ {ticket_medio:.2f}. Ofereça serviços adicionais."))
+        else:
+            insights.append(("destaque",f"💰 Ticket médio saudável: R$ {ticket_medio:.2f}. Continue assim!"))
+        if mens_ativos<meta_mens:
+            insights.append(("atencao",f"👥 Poucos mensalistas ativos: {mens_ativos}/{meta_mens}. Crie promoções de fidelidade."))
+        else:
+            insights.append(("oportunidade",f"👥 Mensalistas ativos: {mens_ativos}. Base sólida!"))
         if not ranking.empty:
             insights.append(("destaque",f"🏆 Serviço mais popular: {ranking.iloc[0]['servico']} ({ranking.iloc[0]['Lavagens']} lavagens)."))
         if len(rec_mes)>=2:
@@ -550,11 +556,10 @@ with tab3:
     else:
         st.info("💡 Nenhum dado de lavagem ainda. Registre lavagens para ver as análises.")
 
-        st.markdown("---")
-
-        st.markdown("---")
-        with st.expander("⚠️ **Administrador — Resetar Banco de Dados**"):
-                col1, col2 = st.columns([1, 1])
+    # ---- RESETAR BANCO (sempre visível na tab3) ----
+    st.markdown("---")
+    with st.expander("⚠️ **Administrador — Resetar Banco de Dados**"):
+        col1, col2 = st.columns([1, 1])
         with col1:
             senha_reset = st.text_input("Digite a senha de administrador para resetar:", type="password", key="senha_reset")
         with col2:
@@ -582,14 +587,12 @@ with tab3:
 
 st.markdown(f"""<div style="text-align:center;color:#9ca3af;font-size:0.8rem;">🚗 Lava Jato Dashboard v2.0 · {datetime.now().strftime('%d/%m/%Y %H:%M')}</div>""", unsafe_allow_html=True)
 
-        # 
-        # 📥 EXPORTAR RELATÓRIO
-        # 
+# ============================================================
+# 📥 EXPORTAR RELATÓRIO
+# ============================================================
 st.markdown("---")
 st.markdown("#### 📥 Exportar Relatório")
-
 col_exp1, col_exp2 = st.columns(2)
-
 with col_exp1:
     if st.button("📊 Baixar Excel", type="primary", use_container_width=True):
         output = BytesIO()
@@ -597,13 +600,11 @@ with col_exp1:
             df_lav.to_excel(writer, sheet_name='Lavagens', index=False)
             if not df_mens.empty:
                 df_mens.to_excel(writer, sheet_name='Mensalistas', index=False)
-            resumo_export = df_ano.groupby('mes').agg(
-                Lavagens=('id', 'count'),
-                Receita=('valor', 'sum')
-            ).reset_index()
-            resumo_export.columns = ['Mês', 'Lavagens', 'Receita']
-            resumo_export.to_excel(writer, sheet_name='Resumo Mensal', index=False)
-            if not ranking.empty:
+            if 'df_ano' in locals() and not df_ano.empty:
+                resumo_export = df_ano.groupby('mes').agg(Lavagens=('id','count'),Receita=('valor','sum')).reset_index()
+                resumo_export.columns = ['Mês', 'Lavagens', 'Receita']
+                resumo_export.to_excel(writer, sheet_name='Resumo Mensal', index=False)
+            if 'ranking' in locals() and not ranking.empty:
                 ranking.to_excel(writer, sheet_name='Ranking Serviços', index=False)
         output.seek(0)
         st.download_button(
@@ -613,32 +614,25 @@ with col_exp1:
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             key="dl_excel"
         )
-
 with col_exp2:
     if st.button("📄 Baixar PDF", type="primary", use_container_width=True):
         try:
             from fpdf import FPDF
-            
             pdf = FPDF()
             pdf.add_page()
             pdf.set_auto_page_break(auto=True, margin=15)
-            
             pdf.set_font("Helvetica", "B", 18)
             pdf.cell(0, 15, "Relatorio Lava Jato", new_x="LMARGIN", new_y="NEXT", align="C")
             pdf.set_font("Helvetica", "", 10)
             pdf.cell(0, 8, f"Periodo: {mes_sel}/{ano_sel}  |  Gerado em {datetime.now().strftime('%d/%m/%Y %H:%M')}", new_x="LMARGIN", new_y="NEXT", align="C")
             pdf.ln(8)
-
-            # KPIs
             pdf.set_font("Helvetica", "B", 12)
             pdf.cell(0, 10, "Indicadores do Mes", new_x="LMARGIN", new_y="NEXT")
             pdf.set_font("Helvetica", "", 10)
             pdf.cell(0, 7, f"Lavagens: {total_lav}  |  Receita: R$ {receita_lav:.2f}  |  Ticket Medio: R$ {ticket_medio:.2f}", new_x="LMARGIN", new_y="NEXT")
             pdf.cell(0, 7, f"Mensalistas Ativos: {mens_ativos}", new_x="LMARGIN", new_y="NEXT")
             pdf.ln(5)
-
-            # Ranking
-            if not ranking.empty:
+            if 'ranking' in locals() and not ranking.empty:
                 pdf.set_font("Helvetica", "B", 12)
                 pdf.cell(0, 10, "Ranking de Servicos", new_x="LMARGIN", new_y="NEXT")
                 pdf.set_font("Helvetica", "B", 10)
@@ -654,9 +648,7 @@ with col_exp2:
                     pdf.cell(col_w[2], 7, f"{r['Receita']:.2f}", border=1, align="R")
                     pdf.ln()
                 pdf.ln(5)
-
-            # Resumo Mensal
-            if not resumo_export.empty:
+            if 'df_ano' in locals() and not df_ano.empty:
                 pdf.set_font("Helvetica", "B", 12)
                 pdf.cell(0, 10, "Resumo Mensal", new_x="LMARGIN", new_y="NEXT")
                 pdf.set_font("Helvetica", "B", 10)
@@ -677,11 +669,8 @@ with col_exp2:
                     pdf.cell(col_w2[3], 7, f"{dif:+.1f}%" if dif else "-", border=1, align="C")
                     pdf.ln()
                 pdf.ln(5)
-
-            # Rodapé
             pdf.set_font("Helvetica", "I", 8)
             pdf.cell(0, 10, "Relatorio gerado automaticamente pelo Sistema Lava Jato", new_x="LMARGIN", new_y="NEXT", align="C")
-
             pdf_bytes = pdf.output()
             st.download_button(
                 label="💾 Salvar PDF",
