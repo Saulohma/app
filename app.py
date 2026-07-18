@@ -328,14 +328,14 @@ with tab1:
         valor_base = get_preco(tipo_veiculo, servico)
         quantidade = st.number_input("Quantidade", min_value=1, value=1, step=1, key="qtd")
         valor_total = valor_base * quantidade
-        st.markdown(f"""<div style="background:#f3f4f6;border-radius:12px;padding:1rem;margin-bottom:1rem;"><p style="margin:0;color:#6b7280;font-size:0.85rem;">Valor Unitário</p><p style="margin:0;font-size:1.5rem;font-weight:800;color:#111827;">R$ {valor_base:.2f}</p><p style="margin:0;color:#6b7280;font-size:0.85rem;margin-top:0.5rem;">Valor Total ({quantidade}x)</p><p style="margin:0;font-size:1.8rem;font-weight:800;color:#1e3a5f;">R$ {valor_total:.2f}</p></div>""", unsafe_allow_html=True)
+        st.markdown(f"""<div style="background:#f3f4f6;border-radius:12px;padding:1rem;margin-bottom:1rem;"><p style="margin:0;color:#6b7280;font-size:0.85rem;">Valor Unitário</p><p style="margin:0;font-size:1.5rem;font-weight:800;color:#111827;">R$ {{float(valor_base):.2f}</p><p style="margin:0;color:#6b7280;font-size:0.85rem;margin-top:0.5rem;">Valor Total ({quantidade}x)</p><p style="margin:0;font-size:1.8rem;font-weight:800;color:#1e3a5f;">R$ {{float(valor_total):.2f}</p></div>""", unsafe_allow_html=True)
         data_lavagem = st.date_input("Data", value=date.today(), key="dl")
         cliente = st.text_input("Nome do Cliente", key="cl", placeholder="Nome (ou deixe vazio)")
         placa = st.text_input("Placa", key="pl", placeholder="Placa").upper()
         if st.button("💾 Registrar Lavagem", type="primary", use_container_width=True):
             nome_cliente = cliente.strip().upper() if cliente.strip() else f"{tipo_veiculo} #1"
             registrar_lavagem(data_lavagem.strftime("%Y-%m-%d"), tipo_veiculo, servico, valor_total, nome_cliente, placa.strip().upper(), quantidade)
-            st.success(f"✅ Lavagem registrada: {nome_cliente} - {servico} - R$ {valor_total:.2f}")
+            st.success(f"✅ Lavagem registrada: {nome_cliente} - {servico} - R$ {{float(valor_total):.2f}")
             st.rerun()
     with col_history:
         st.markdown("#### 📋 Últimas Lavagens")
@@ -511,8 +511,8 @@ with tab3:
                     if ant>0: res.loc[res.index[i],'Dif.'] = ((atu-ant)/ant)*100
                 res['Rec.'] = res['Receita'].apply(lambda v: f"R$ {v::,.2f}".replace(",","X").replace(".",",").replace("X","."))
                 def fd(v):
-                    if v>0: return f"🟢 +{v:.1f}%"
-                    elif v<0: return f"🔴 {v:.1f}%"
+                    if v>0: return f"🟢 +{{float(v):.1f}%"
+                    elif v<0: return f"🔴 {{float(v):.1f}%"
                     else: return "—"
                 res['Dif.'] = res['Dif.'].apply(fd)
                 th = "<table style='width:100%;border-collapse:collapse;font-size:0.8rem;'><thead><tr style='background:#1e3a5f;color:white;'><th style='padding:6px 8px;text-align:left;'>Mês</th><th style='padding:6px 8px;text-align:center;'>Lav.</th><th style='padding:6px 8px;text-align:right;'>Receita</th><th style='padding:6px 8px;text-align:center;'>Dif.</th></tr></thead><tbody>"
@@ -535,9 +535,9 @@ with tab3:
         else:
             insights.append(("oportunidade",f"✅ Meta de lavagens atingida: {total_lav}/{meta_lav}. Busque superar!"))
         if ticket_medio<meta_ticket:
-            insights.append(("risco",f"💸 Ticket médio baixo: R$ {ticket_medio:.2f}. Ofereça serviços adicionais."))
+            insights.append(("risco",f"💸 Ticket médio baixo: R$ {{float(ticket_medio):.2f}. Ofereça serviços adicionais."))
         else:
-            insights.append(("destaque",f"💰 Ticket médio saudável: R$ {ticket_medio:.2f}. Continue assim!"))
+            insights.append(("destaque",f"💰 Ticket médio saudável: R$ {{float(ticket_medio):.2f}. Continue assim!"))
         if mens_ativos<meta_mens:
             insights.append(("atencao",f"👥 Poucos mensalistas ativos: {mens_ativos}/{meta_mens}. Crie promoções de fidelidade."))
         else:
@@ -548,8 +548,8 @@ with tab3:
             ultimos = rec_mes.sort_values('mes').tail(2)
             if len(ultimos)==2:
                 var = ((ultimos.iloc[1]['valor']-ultimos.iloc[0]['valor'])/ultimos.iloc[0]['valor'])*100
-                if var>10: insights.append(("destaque",f"📈 Faturamento cresceu {var:.1f}% em relação ao mês anterior!"))
-                elif var<-10: insights.append(("risco",f"📉 Faturamento caiu {abs(var):.1f}%. Atenção!"))
+                if var>10: insights.append(("destaque",f"📈 Faturamento cresceu {{float(var):.1f}% em relação ao mês anterior!"))
+                elif var<-10: insights.append(("risco",f"📉 Faturamento caiu {{float(abs(var)):.1f}%. Atenção!"))
                 else: insights.append(("oportunidade",f"📊 Faturamento estável ({var:+.1f}%). Busque crescimento."))
         for t, txt in insights:
             st.markdown(f"""<div style="background:white;border-radius:12px;padding:1rem;box-shadow:0 1px 3px rgba(0,0,0,0.06);margin-bottom:0.5rem;display:flex;align-items:center;gap:0.5rem;"><span class="tag {t}">{t.upper()}</span><span style="color:#374151;font-size:0.95rem;">{txt}</span></div>""", unsafe_allow_html=True)
@@ -629,7 +629,7 @@ with col_exp2:
             pdf.set_font("Helvetica", "B", 12)
             pdf.cell(0, 10, "Indicadores do Mes", new_x="LMARGIN", new_y="NEXT")
             pdf.set_font("Helvetica", "", 10)
-            pdf.cell(0, 7, f"Lavagens: {total_lav}  |  Receita: R$ {receita_lav:.2f}  |  Ticket Medio: R$ {ticket_medio:.2f}", new_x="LMARGIN", new_y="NEXT")
+            pdf.cell(0, 7, f"Lavagens: {total_lav}  |  Receita: R$ {{float(receita_lav):.2f}  |  Ticket Medio: R$ {{float(ticket_medio):.2f}", new_x="LMARGIN", new_y="NEXT")
             pdf.cell(0, 7, f"Mensalistas Ativos: {mens_ativos}", new_x="LMARGIN", new_y="NEXT")
             pdf.ln(5)
             if 'ranking' in locals() and not ranking.empty:
@@ -645,7 +645,7 @@ with col_exp2:
                 for _, r in ranking.head(10).iterrows():
                     pdf.cell(col_w[0], 7, str(r['servico']), border=1)
                     pdf.cell(col_w[1], 7, str(r['Lavagens']), border=1, align="C")
-                    pdf.cell(col_w[2], 7, f"{r['Receita']:.2f}", border=1, align="R")
+                    pdf.cell(col_w[2], 7, f"{{float(r['Receita']):.2f}", border=1, align="R")
                     pdf.ln()
                 pdf.ln(5)
             if 'df_ano' in locals() and not df_ano.empty:
@@ -664,7 +664,7 @@ with col_exp2:
                 for _, r in res_comp.iterrows():
                     pdf.cell(col_w2[0], 7, meses_nomes.get(int(r['mes']), str(r['mes'])), border=1, align="C")
                     pdf.cell(col_w2[1], 7, str(r['Lavagens']), border=1, align="C")
-                    pdf.cell(col_w2[2], 7, f"{r['Receita']:.2f}", border=1, align="R")
+                    pdf.cell(col_w2[2], 7, f"{{float(r['Receita']):.2f}", border=1, align="R")
                     dif = r['Dif.'] if pd.notna(r['Dif.']) else 0
                     pdf.cell(col_w2[3], 7, f"{dif:+.1f}%" if dif else "-", border=1, align="C")
                     pdf.ln()
