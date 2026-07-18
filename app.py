@@ -420,33 +420,36 @@ with tab3:
     df_lav = carregar_lavagens()
     df_mens = carregar_mensalistas()
     if not df_lav.empty:
-        df_lav['mes'] = df_lav['data'].dt.month; df_lav['ano'] = df_lav['data'].dt.year
-        df_lav['mes_ano'] = df_lav['data'].dt.strftime('%Y-%m')
-        df_lav['dia_semana'] = df_lav['data'].dt.dayofweek
-        anos_disp = sorted(df_lav['ano'].unique(), reverse=True)
-        meses_disp = sorted(int(m) for m in df_lav['mes'].unique() if pd.notna(m))
-        flt1, flt2, flt3 = st.columns(3)
-        with flt1: ano_sel = st.selectbox("Ano", anos_disp, key="as")
-        with flt2:
-            if meses_disp:
-                mes_sel = st.selectbox("Mês", [f"{int(m):02d}" for m in meses_disp], key="ms")
-            else:
-                mes_sel = None
-                st.selectbox("Mês", ["—"], key="ms")
-        with flt3:
-            servs = sorted(df_lav['servico'].unique())
-            serv_sel = st.selectbox("Serviço", ["Todos"]+servs, key="ss")
-        if mes_sel is not None:
-            df_filtro = df_lav[(df_lav['ano']==ano_sel)&(df_lav['mes']==int(mes_sel))]
+            df_lav['mes'] = df_lav['data'].dt.month; df_lav['ano'] = df_lav['data'].dt.year
+    df_lav['mes_ano'] = df_lav['data'].dt.strftime('%Y-%m')
+    df_lav['dia_semana'] = df_lav['data'].dt.dayofweek
+    anos_disp = sorted(df_lav['ano'].unique(), reverse=True)
+    meses_disp = sorted(int(m) for m in df_lav['mes'].unique() if pd.notna(m))
+    flt1, flt2, flt3 = st.columns(3)
+    with flt1: ano_sel = st.selectbox("Ano", anos_disp, key="as")
+    with flt2:
+        if meses_disp:
+            mes_sel = st.selectbox("Mês", [f"{int(m):02d}" for m in meses_disp], key="ms")
         else:
-            df_filtro = df_lav.copy()
+            mes_sel = None
+            st.selectbox("Mês", ["—"], key="ms")
+    with flt3:
+        servs = sorted(df_lav['servico'].unique())
+        serv_sel = st.selectbox("Serviço", ["Todos"]+servs, key="ss")
 
-        def sf(v,m):
-            if v>=m: return "verde"
-            elif v>=m*0.7: return "amarelo"
-            else: return "vermelho"
+    # Filtro seguro — sempre gera df_filtro
+    if mes_sel is not None:
+        df_filtro = df_lav[(df_lav['ano']==ano_sel)&(df_lav['mes']==int(mes_sel))]
+    else:
+        df_filtro = df_lav.copy()
 
-        s_lav=sf(total_lav,meta_lav); s_rec=sf(receita_lav,meta_rec); s_mens=sf(mens_ativos,meta_mens); s_tick=sf(ticket_medio,meta_ticket)
+    if serv_sel!="Todos":
+        df_filtro = df_filtro[df_filtro['servico']==serv_sel]
+
+        total_lav = len(df_filtro)
+        receita_lav = df_filtro['valor'].sum() if total_lav>0 else 0
+        ticket_medio = receita_lav/total_lav if total_lav>0 else 0
+        mens_ativos = len(df_mens[df_mens['ativo']==1]) if not df_mens.empty else 0
         k1,k2,k3,k4 = st.columns(4)
         for c,s,t,v,meta in [(k1,s_lav,"Lavagens no Mês",total_lav,meta_lav),(k2,s_rec,"Receita Lavagens",f"R$ {receita_lav:,.2f}",f"R$ {meta_rec:,.0f}"),(k3,s_mens,"Mensalistas Ativos",mens_ativos,meta_mens),(k4,s_tick,"Ticket Médio",f"R$ {ticket_medio:,.2f}",f"R$ {meta_ticket:,.0f}")]:
             c.markdown(f"""<div class="card-executivo {s}"><div class="kpi-label">{t}</div><div class="kpi-value">{v}</div><div class="kpi-meta">Meta: {meta}</div><div class="semaforo {s}">{s.upper()}</div></div>""", unsafe_allow_html=True)
