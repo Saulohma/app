@@ -436,7 +436,9 @@ with tab3:
     df_lav = carregar_lavagens()
     df_mens = carregar_mensalistas()
     if not df_lav.empty:
-            df_lav['mes'] = df_lav['data'].dt.month; df_lav['ano'] = df_lav['data'].dt.year
+        df_lav['data'] = pd.to_datetime(df_lav['data'], errors='coerce')
+        df_lav = df_lav.dropna(subset=['data'])
+        df_lav['mes'] = df_lav['data'].dt.month
     df_lav['mes_ano'] = df_lav['data'].dt.strftime('%Y-%m')
     df_lav['dia_semana'] = df_lav['data'].dt.dayofweek
     anos_disp = sorted(df_lav['ano'].unique(), reverse=True)
