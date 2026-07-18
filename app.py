@@ -64,7 +64,7 @@ st.set_page_config(
 DB_URL = os.environ.get("DATABASE_URL", "")
 
 def get_conn():
-    conn = psycopg2.connect(DB_URL)
+    conn = psycopg2.connect(DB_URL, cursor_factory=RealDictCursor)
     conn.autocommit = True
     return conn
 
@@ -154,7 +154,7 @@ def migrar_excel():
                 c = str(r.get('cliente') or r.get('Cliente') or '').strip().upper()
                 p = str(r.get('placa') or r.get('Placa') or '').strip().upper()
                 q = int(r.get('quantidade') or r.get('Quantidade') or 1)
-                cursor.execute("""INSERT INTO lavagens (data,tipo_veiculo,servico,valor,cliente,placa,quantidade) VALUES (?,?,?,?,?,?,?)""", (d,t,s,v,c,p,q))
+                cursor.execute("""INSERT INTO lavagens (data,tipo_veiculo,servico,valor,cliente,placa,quantidade) VALUES (%s,%s,%s,%s,%s,%s,%s)""", (d,t,s,v,c,p,q))
             conn.commit()
         except: pass
     xlsxm = Path(__file__).parent / "mensalistas.xlsx"
@@ -175,7 +175,7 @@ def migrar_excel():
                     except: di = date.today().strftime('%Y-%m-%d')
                 else: di = date.today().strftime('%Y-%m-%d')
                 a = int(r.get('ativo') or r.get('Ativo') or 0)
-                cursor.execute("""INSERT INTO mensalistas (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo) VALUES (?,?,?,?,?,?,?,?)""", (n,t,tp,p,pl,v,di,a))
+                cursor.execute("""INSERT INTO mensalistas (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo) VALUES (%s,%s,%s,%s,%s,%s,%s,%s)""", (n,t,tp,p,pl,v,di,a))
             conn.commit()
         except: pass
     conn.close()
@@ -202,42 +202,44 @@ def carregar_mensalistas():
 def get_preco(tipo, servico):
     conn = get_conn()
     c = conn.cursor()
-    c.execute("SELECT valor FROM precos WHERE tipo_veiculo=? AND servico=?", (tipo, servico))
+    c.execute("SELECT valor FROM precos WHERE tipo_veiculo=%s AND servico=%s", (tipo, servico))
     r = c.fetchone()
     conn.close()
     return r['valor'] if r else 0.0
 
 def registrar_lavagem(data, tipo, servico, valor, cliente, placa, quantidade):
     conn = get_conn()
-    conn.execute("""INSERT INTO lavagens (data,tipo_veiculo,servico,valor,cliente,placa,quantidade) VALUES (?,?,?,?,?,?,?)""", (data,tipo,servico,valor,cliente,placa,quantidade))
+    conn.execute("""INSERT INTO lavagens (data,tipo_veiculo,servico,valor,cliente,placa,quantidade) VALUES (%s,%s,%s,%s,%s,%s,%s)""", (data,tipo,servico,valor,cliente,placa,quantidade))
     conn.commit()
     conn.close()
 
 def adicionar_mensalista(nome, telefone, tipo, placa, plano, valor_plano, data_inicio):
     conn = get_conn()
-    conn.execute("""INSERT INTO mensalistas (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo) VALUES (?,?,?,?,?,?,?,0)""", (nome,telefone,tipo,placa,plano,valor_plano,data_inicio))
+    conn.execute("""INSERT INTO mensalistas (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo) VALUES (%s,%s,%s,%s,%s,%s,%s,0)""", (nome,telefone,tipo,placa,plano,valor_plano,data_inicio))
     conn.commit()
     conn.close()
 
+
+
 def atualizar_mensalista(id, nome, telefone, tipo, placa, plano, valor_plano, data_inicio, ativo):
     conn = get_conn()
-    conn.execute("""UPDATE mensalistas SET nome=?,telefone=?,tipo=?,placa=?,plano=?,valor_plano=?,data_inicio=?,ativo=? WHERE id=?""", (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo,id))
+    conn.execute("""UPDATE mensalistas SET nome=%s,telefone=%s,tipo=%s,placa=%s,plano=%s,valor_plano=%s,data_inicio=%s,ativo=%s WHERE id=%s""", (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo,id))
     conn.commit()
     conn.close()
 
 def toggle_mensalista(id):
     conn = get_conn()
     c = conn.cursor()
-    c.execute("SELECT ativo FROM mensalistas WHERE id=?", (id,))
+    c.execute("SELECT ativo FROM mensalistas WHERE id=%s", (id,))
     r = c.fetchone()
     if r:
-        conn.execute("UPDATE mensalistas SET ativo=? WHERE id=?", (0 if r['ativo'] else 1, id))
+        conn.execute("UPDATE mensalistas SET ativo=%s WHERE id=%s", (0 if r['ativo'] else 1, id))
         conn.commit()
     conn.close()
 
 def excluir_mensalista(id):
     conn = get_conn()
-    conn.execute("DELETE FROM mensalistas WHERE id=?", (id,))
+    conn.execute("DELETE FROM mensalistas WHERE id=%s", (id,))
     conn.commit()
     conn.close()
 
