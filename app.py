@@ -134,7 +134,7 @@ def migrar_excel():
     conn = get_conn()
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) FROM lavagens")
-    if cursor.fetchone()[0] > 0:
+    if list(cursor.fetchone().values())[0] > 0:
         conn.close()
         return
     xlsx = Path(__file__).parent / "dados.xlsx"
@@ -550,6 +550,35 @@ with tab3:
         st.info("💡 Nenhum dado de lavagem ainda. Registre lavagens para ver as análises.")
 
 st.markdown("---")
+
+        st.markdown("---")
+    with st.expander("⚠️ **Administrador — Resetar Banco de Dados**"):
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            senha_reset = st.text_input("Digite a senha de administrador para resetar:", type="password", key="senha_reset")
+        with col2:
+            st.markdown("###  ")
+            st.markdown("###  ")
+            if st.button("🗑️ Resetar TODOS os dados", type="primary", use_container_width=True):
+                if senha_reset == "admin757":
+                    st.warning("⚠️ **ATENÇÃO!** Isso vai apagar TODAS as lavagens e mensalistas!")
+                    col_confirm, _ = st.columns([1, 3])
+                    with col_confirm:
+                        if st.button("✅ CONFIRMAR RESET", type="primary", use_container_width=True):
+                            try:
+                                conn = get_conn()
+                                conn.execute("DELETE FROM lavagens")
+                                conn.execute("DELETE FROM mensalistas")
+                                conn.commit()
+                                conn.close()
+                                st.success("✅ Banco resetado com sucesso! Todos os dados foram apagados.")
+                                st.cache_data.clear()
+                                st.rerun()
+                            except Exception as e:
+                                st.error(f"Erro ao resetar: {e}")
+                elif senha_reset:
+                    st.error("❌ Senha incorreta!")
+
 st.markdown(f"""<div style="text-align:center;color:#9ca3af;font-size:0.8rem;">🚗 Lava Jato Dashboard v2.0 · {datetime.now().strftime('%d/%m/%Y %H:%M')}</div>""", unsafe_allow_html=True)
 
         # 
