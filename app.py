@@ -141,7 +141,7 @@ migrar_excel()
 # ============================================================
 def carregar_lavagens():
     conn = get_conn()
-    df = pd.read_sql_query("SELECT * FROM lavagens ORDER BY data DESC", conn)
+    df = pd.read_sql_query("SELECT * FROM lavagens ORDER BY id DESC", conn)
     conn.close()
     if not df.empty: df['data'] = pd.to_datetime(df['data'])
     return df
