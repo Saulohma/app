@@ -582,7 +582,11 @@ with tab2:
     col_cad, col_lista = st.columns([1, 2])
     with col_cad:
         st.markdown("#### ➕ Novo Mensalista")
-        with st.form("form_mens"):
+        if 'refresh_key' not in st.session_state:
+        st.session_state.refresh_key = 0
+
+    df_mens = carregar_mensalistas()
+    with st.form("form_mens"):
             nome_m = st.text_input("Nome", key="nm").strip().upper()
             tel_m = st.text_input("Telefone", key="tm", placeholder="(99) 99999-9999")
             tipo_m = st.selectbox("Tipo", ["Comum","SUV","Caminhonete","Moto"], key="tpm")
@@ -610,12 +614,15 @@ with tab2:
     df_mens['valor_plano'] = pd.to_numeric(df_mens['valor_plano'], errors='coerce').fillna(0)
     df_mens = df_mens.reset_index(drop=True)
     for idx, row in df_mens.iterrows():
-        sc = "ativo" if row['ativo'] else "inativo"
-        stxt = "🟢 Ativo" if row['ativo'] else "🔴 Inativo"
-        st.markdown(f"""<div class="card-mensalista {sc}"><div style="display:flex;justify-content:space-between;align-items:start;"><div><div class="nome">{row['nome']}</div><div class="info">📞 {row['telefone'] or '—'}</div><div class="info">🚗 {row['tipo']} | {row['placa'] or '—'}</div><div class="info">📋 {row['plano']} — R$ {row['valor_plano']:.2f}</div><div class="info">📅 Início: {row['data_inicio'] or '—'}</div><div style="margin-top:6px;">{stxt}</div></div></div></div>""", unsafe_allow_html=True)
+        ativo_bool = bool(int(row['ativo'])) if row['ativo'] is not None else False
+        sc = "ativo" if ativo_bool else "inativo"
+        stxt = "🟢 Ativo" if ativo_bool else "🟥 Inativo"
+        cor_borda = "#10b981" if ativo_bool else "#ef4444"
+        st.markdown(f"""<div class="card-mensalista {sc}" style="border-color: {cor_borda} !important; border-width: 2px !important;"><div style="display:flex;justify-content:space-between;align-items:start;"><div><div class="nome">{row['nome']}</div><div class="info">📞 {row['telefone']}</div><div class="info">{row['tipo']} | {row['placa']}</div><div class="info">{row['plano']} — R$ {float(row['valor_plano']):.2f}</div><div class="info">📅 Início: {row['data_inicio']}</div></div>{stxt}</div></div>""", unsafe_allow_html=True)
         c1, c2, c3 = st.columns([1,1,1])
         with c1:
-            if st.button("🔄 Ativar/Desativar", key=f"t_{idx}", use_container_width=True):
+            if  st.button("🔄 Ativar/Desativar", key=f"t_{idx}", use_container_width=True):
+                st.session_state.refresh_key += 1  # ← ADICIONA
                 toggle_mensalista(row['id']); st.rerun()
         with c2:
             if st.button("✏️ Editar", key=f"e_{idx}", use_container_width=True):
