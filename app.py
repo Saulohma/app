@@ -661,6 +661,11 @@ with tab2:
 with tab3:
     st.markdown("#### 📊 Análises Executivas")
     df_lav = carregar_lavagens()
+    # DEBUG: mostra dados crus do banco
+    st.write("🔍 DEBUG - Dados crus do banco:")
+    st.write(f"Total de registros: {len(df_lav)}")
+    if not df_lav.empty:
+        st.dataframe(df_lav[['id','data','cliente','servico','valor']].head(10))
     df_mens = carregar_mensalistas()
 
     # Valores padrão ANTES de qualquer IF
@@ -674,8 +679,11 @@ with tab3:
 
     if not df_lav.empty:
         df_lav['data'] = pd.to_datetime(df_lav['data'], errors='coerce')
+        st.write(f"🔍 DEBUG - Após conversão de data: {len(df_lav)} registros")
+        st.write(f"Registros com data inválida (NaT): {df_lav['data'].isna().sum()}")
         df_lav = df_lav.dropna(subset=['data']).reset_index(drop=True)
-        
+        st.write(f"🔍 DEBUG - Após dropna: {len(df_lav)} registros")
+                
         if not df_lav.empty:
             df_lav['mes'] = df_lav['data'].dt.month
             df_lav['ano'] = df_lav['data'].dt.year
