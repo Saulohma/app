@@ -887,10 +887,11 @@ with tab3:
     receita_liquida = receita_lav - total_desp
 
     mens_ativos = len(df_mens[df_mens['ativo'] == 1]) if not df_mens.empty else 0
+    meta_lav = 20; meta_rec = 3000; meta_mens = 3; meta_ticket = 120; meta_lucro = 2000
     def sf(v, m):
         if v >= m: return "verde"
         elif v >= m * 0.7: return "amarelo"
-        else: return "vermelho"
+        else: return "vermelho
     s_lav = sf(total_lav, meta_lav)
     s_rec = sf(receita_lav, meta_rec)
     s_mens = sf(mens_ativos, meta_mens)
