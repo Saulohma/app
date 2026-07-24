@@ -196,17 +196,19 @@ def migrar_excel():
                 elif isinstance(d, str):
                     try: d = datetime.strptime(d.strip(), '%d/%m/%Y').strftime('%Y-%m-%d')
                     except: d = date.today().strftime('%Y-%m-%d')
-                else: d = date.today().strftime('%Y-%m-%d')
-                t = str(r.get('tipo_veiculo') or r.get('Tipo') or 'Comum').strip()
-                s = str(r.get('servico') or r.get('Serviço') or '').strip()
-                v = float(r.get('valor') or r.get('Valor') or 0)
-                c = str(r.get('cliente') or r.get('Cliente') or '').strip().upper()
-                p = str(r.get('placa') or r.get('Placa') or '').strip().upper()
-                q = int(r.get('quantidade') or r.get('Quantidade') or 1)
-                cursor.execute("""INSERT INTO lavagens (data,tipo_veiculo,servico,valor,cliente,placa,quantidade) VALUES (%s,%s,%s,%s,%s,%s,%s)""", (d,t,s,v,c,p,q))
-            conn.commit()
-        except Exception as e:
-            print(f"Erro migração lavagens: {e}")
+                if isinstance(d, (datetime, pd.Timestamp)):
+                    d = d.strftime('%Y-%m-%d %H:%M:%S')
+                elif isinstance(d, str):
+                    try:
+        # Tenta com hora primeiro
+                     d = datetime.strptime(d.strip(), '%d/%m/%Y %H:%M').strftime('%Y-%m-%d %H:%M:%S')
+                    except:
+                        try:
+                            d = datetime.strptime(d.strip(), '%d/%m/%Y').strftime('%Y-%m-%d %H:%M:%S')
+                    except:
+                            d = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+                else:
+                    d = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
 
     # --- MENSALISTAS ---
     xlsxm = Path(__file__).parent / "mensalistas.xlsx"
@@ -372,9 +374,9 @@ def migrar_excel():
                 try: v = float(r.get('valor_plano') or r.get('Valor Plano') or r.get('valor') or 0)
                 except: v = 0
                 di = r.get('data_inicio') or r.get('Data Início') or r.get('data') or date.today()
-                if isinstance(di, (datetime, pd.Timestamp)): di = di.strftime('%Y-%m-%d')
-                elif isinstance(di, str):
-                    try: di = datetime.strptime(di.strip(), '%d/%m/%Y').strftime('%Y-%m-%d')
+                if isinstance(d, (datetime, pd.Timestamp)): d = d.strftime('%Y-%m-%d')
+                elif isinstance(d, str):
+                    try: d = datetime.strptime(d.strip(), '%d/%m/%Y').strftime('%Y-%m-%d')   
                     except: di = date.today().strftime('%Y-%m-%d')
                 else: di = date.today().strftime('%Y-%m-%d')
                 try: a = int(r.get('ativo') or r.get('Ativo') or 1)
@@ -1142,20 +1144,7 @@ if is_admin:
 
         st.markdown("---")
 
-        # ─── ESTATÍSTICAS ───
-        st.markdown("##### 📊 Estatísticas")
-        if not df_users.empty:
-            total_users = len(df_users)
-            total_admins = len(df_users[df_users['role'] == 'admin'])
-            total_clientes = len(df_users[df_users['role'] == 'cliente'])
-            c1, c2, c3 = st.columns(3)
-            c1.markdown(f"""<div class="card-executivo verde"><div class="kpi-label">Total</div><div class="kpi-value">{total_users}</div></div>""", unsafe_allow_html=True)
-            c2.markdown(f"""<div class="card-executivo" style="border-left-color:#1e40af;"><div class="kpi-label">🔧 Master</div><div class="kpi-value">{total_admins}</div></div>""", unsafe_allow_html=True)
-            c3.markdown(f"""<div class="card-executivo" style="border-left-color:#065f46;"><div class="kpi-label">👤 Clientes</div><div class="kpi-value">{total_clientes}</div></div>""", unsafe_allow_html=True)        
-        
-
-        st.markdown("---")
-st.markdown("##### ☢️ Zona de Perigo")
+        st.markdown("##### ☢️ Zona de Perigo")
 
 with st.expander("⚠️ Resetar Todos os Dados do Sistema", expanded=False):
     st.warning("""
@@ -1196,7 +1185,22 @@ with st.expander("⚠️ Resetar Todos os Dados do Sistema", expanded=False):
         else:
             st.error("❌ Senha incorreta! Operação cancelada.")
 
-            
+        # ─── ESTATÍSTICAS ───
+        st.markdown("##### 📊 Estatísticas")
+        if not df_users.empty:
+            total_users = len(df_users)
+            total_admins = len(df_users[df_users['role'] == 'admin'])
+            total_clientes = len(df_users[df_users['role'] == 'cliente'])
+            c1, c2, c3 = st.columns(3)
+            c1.markdown(f"""<div class="card-executivo verde"><div class="kpi-label">Total</div><div class="kpi-value">{total_users}</div></div>""", unsafe_allow_html=True)
+            c2.markdown(f"""<div class="card-executivo" style="border-left-color:#1e40af;"><div class="kpi-label">🔧 Master</div><div class="kpi-value">{total_admins}</div></div>""", unsafe_allow_html=True)
+            c3.markdown(f"""<div class="card-executivo" style="border-left-color:#065f46;"><div class="kpi-label">👤 Clientes</div><div class="kpi-value">{total_clientes}</div></div>""", unsafe_allow_html=True)        
+        
+
+        st.markdown("---")
+
+
+
 # ============================================================
 # 📥 EXPORTAR RELATÓRIO
 # ============================================================
