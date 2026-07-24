@@ -142,6 +142,22 @@ def init_db():
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS despesas (
+                id SERIAL PRIMARY KEY,
+                categoria TEXT NOT NULL,
+                descricao TEXT DEFAULT '',
+                valor NUMERIC NOT NULL,
+                mes INTEGER NOT NULL,
+                ano INTEGER NOT NULL,
+                data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        # Corrige schema de tabelas existentes
+        try:
+            cur.execute("ALTER TABLE despesas ADD COLUMN IF NOT EXISTS descricao TEXT DEFAULT ''")
+        except Exception:
+            pass
     conn.commit()
     conn.close()
 
@@ -437,7 +453,61 @@ def excluir_mensalista(id):
         cur.execute("DELETE FROM mensalistas WHERE id=%s", (id_int,))
     conn.commit()
     conn.close()
+#
+# SISTEMA DE DESPESAS
+#
+def adicionar_despesa(categoria, descricao, valor, mes, ano):
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO despesas (categoria, descricao, valor, mes, ano) VALUES (%s, %s, %s, %s, %s)",
+            (categoria, descricao, valor, mes, ano)
+        )
+    conn.commit()
+    conn.close()
 
+def carregar_despesas(mes=None, ano=None):
+    conn = get_conn()
+    with conn.cursor() as cur:
+        if mes and ano:
+            cur.execute("SELECT * FROM despesas WHERE mes = %s AND ano = %s ORDER BY data_cadastro DESC", (mes, ano))
+        else:
+            cur.execute("SELECT * FROM despesas ORDER BY data_cadastro DESC")
+        rows = cur.fetchall()
+    conn.close()
+    if not rows:
+        return pd.DataFrame()
+    return pd.DataFrame(rows)
+
+def excluir_despesa(id):
+    try:
+        id_int = int(id)
+    except (ValueError, TypeError):
+        st.error("ID inválido")
+        return
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("DELETE FROM despesas WHERE id = %s", (id_int,))
+    conn.commit()
+    conn.close()
+
+def total_despesas(mes, ano):
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("SELECT COALESCE(SUM(valor), 0) AS total FROM despesas WHERE mes = %s AND ano = %s", (mes, ano))
+        r = cur.fetchone()
+    conn.close()
+    return float(r['total'])
+
+def total_por_categoria(mes, ano):
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("SELECT categoria, SUM(valor) AS total FROM despesas WHERE mes = %s AND ano = %s GROUP BY categoria ORDER BY total DESC", (mes, ano))
+        rows = cur.fetchall()
+    conn.close()
+    if not rows:
+        return pd.DataFrame()
+    return pd.DataFrame(rows)
 #
 # INICIALIZAÇÃO
 #
@@ -552,9 +622,9 @@ st.sidebar.markdown("---")
 
 # Abas principais
 if is_admin:
-    tab1, tab2, tab3, tab4 = st.tabs(["📝 Registrar Lavagem", "👥 Mensalistas", "📊 Análises Executivas", "⚙️ Admin"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📝 Registrar Lavagem", "👥 Mensalistas", "💰 Despesas", "📊 Análises Executivas", "⚙️ Admin"])
 else:
-    tab1, tab2, tab3 = st.tabs(["📝 Registrar Lavagem", "👥 Mensalistas", "📊 Análises Executivas"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📝 Registrar Lavagem", "👥 Mensalistas", "💰 Despesas", "📊 Análises Executivas"])
 
 # -------- ABA 1: REGISTRAR LAVAGEM --------
 with tab1:
@@ -676,6 +746,87 @@ with tab2:
                         st.rerun()
             st.markdown("---")
 
+# -------- ABA 3 (ou 4): DESPESAS --------
+aba_despesas = tab3 if not is_admin else tab3
+with aba_despesas:
+    st.markdown("#### 💰 Controle de Despesas")
+
+    # Usa o mesmo filtro de mês/ano
+    hoje = date.today()
+    mes_atual = hoje.month
+    ano_atual = hoje.year
+
+    col_mes, col_ano = st.columns(2)
+    with col_mes:
+        mes_sel_desp = st.selectbox("Mês", range(1, 13), index=mes_atual-1, key="mes_desp",
+            format_func=lambda x: ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"][x-1])
+    with col_ano:
+        ano_sel_desp = st.selectbox("Ano", range(ano_atual-5, ano_atual+1), index=min(5, ano_atual - (ano_atual-5)), key="ano_desp")
+
+    # --- FORMULÁRIO ---
+    with st.expander("➕ Nova Despesa", expanded=False):
+        with st.form("form_despesa"):
+            col1, col2 = st.columns(2)
+            with col1:
+                cat_desp = st.selectbox("Categoria", ["Funcionários", "Máquinas", "Insumos", "Água/Luz", "Aluguel", "Outros"], key="cat_desp")
+                desc_desp = st.text_input("Descrição", placeholder="Ex: Salário João", key="desc_desp")
+            with col2:
+                valor_desp = st.number_input("Valor (R$)", min_value=0.0, step=10.0, format="%.2f", key="val_desp")
+            if st.form_submit_button("💾 Registrar Despesa", type="primary", use_container_width=True):
+                if valor_desp > 0:
+                    adicionar_despesa(cat_desp, desc_desp, valor_desp, mes_sel_desp, ano_sel_desp)
+                    st.success(f"✅ Despesa registrada: {cat_desp} - R$ {valor_desp:.2f}")
+                    st.rerun()
+                else:
+                    st.warning("Informe um valor válido!")
+
+    # --- LISTAGEM E TOTAIS ---
+    df_desp = carregar_despesas(mes_sel_desp, ano_sel_desp)
+
+    if not df_desp.empty:
+        total_desp_mes = float(df_desp['valor'].sum())
+
+        # Cards de resumo
+        c1, c2, c3, c4 = st.columns(4)
+        c1.markdown(f"""<div class="card-executivo vermelho"><div class="kpi-label">💰 Total Despesas</div><div class="kpi-value">R$ {total_desp_mes:,.2f}</div></div>""", unsafe_allow_html=True)
+        c2.markdown(f"""<div class="card-executivo"><div class="kpi-label">📦 Qtd Registros</div><div class="kpi-value">{len(df_desp)}</div></div>""", unsafe_allow_html=True)
+
+        # Gráfico por categoria
+        df_cat = df_desp.groupby('categoria').agg({'valor': 'sum'}).reset_index().sort_values('valor', ascending=False)
+        if not df_cat.empty:
+            import altair as alt
+            chart = alt.Chart(df_cat).mark_bar(size=35).encode(
+                x=alt.X('valor:Q', title='R$'),
+                y=alt.Y('categoria:N', title='', sort='-x'),
+                color=alt.Color('categoria:N', legend=None),
+                tooltip=['categoria', 'valor']
+            ).properties(height=250)
+            st.altair_chart(chart, use_container_width=True)
+
+        # Tabela de despesas
+        st.markdown("##### 📋 Despesas do Período")
+        cols_display = [c for c in ['categoria', 'descricao', 'valor'] if c in df_desp.columns]
+        if 'data_cadastro' in df_desp.columns:
+            df_disp = df_desp[cols_display + ['data_cadastro']].copy()
+            df_disp['data_cadastro'] = pd.to_datetime(df_disp['data_cadastro']).dt.strftime('%d/%m/%Y')
+            cols_display = cols_display + ['data_cadastro']
+        else:
+            df_disp = df_desp[cols_display].copy()
+
+        st.dataframe(df_disp, use_container_width=True, hide_index=True)
+
+        # Excluir despesa
+        with st.expander("🗑️ Excluir Despesa"):
+            df_desp['label'] = df_desp.apply(lambda r: f"#{r['id']} - {r['categoria']} - R$ {float(r['valor']):.2f}", axis=1)
+            desp_para_excluir = st.selectbox("Selecione a despesa", df_desp['label'].tolist(), key="exc_desp")
+            if st.button("🗑️ Excluir Selecionada", type="primary", use_container_width=True):
+                id_exc = int(desp_para_excluir.split(" - ")[0].replace("#", ""))
+                excluir_despesa(id_exc)
+                st.success("Despesa excluída!")
+                st.rerun()
+    else:
+        st.info("Nenhuma despesa registrada para este período.")
+
 # -------- ABA 3: ANÁLISES EXECUTIVAS --------
 with tab3:
     st.markdown("#### 📊 Análises Executivas")
@@ -727,8 +878,15 @@ with tab3:
             st.info("Nenhuma lavagem com data válida.")
     else:
         st.info("Nenhuma lavagem registrada ainda.")
+
+    # Despesas do período selecionado
+    if mes_sel is not None and ano_sel is not None:
+        total_desp = total_despesas(int(mes_sel), ano_sel)
+    else:
+        total_desp = 0
+    receita_liquida = receita_lav - total_desp
+
     mens_ativos = len(df_mens[df_mens['ativo'] == 1]) if not df_mens.empty else 0
-    meta_lav = 20; meta_rec = 3000; meta_mens = 3; meta_ticket = 120
     def sf(v, m):
         if v >= m: return "verde"
         elif v >= m * 0.7: return "amarelo"
@@ -737,12 +895,14 @@ with tab3:
     s_rec = sf(receita_lav, meta_rec)
     s_mens = sf(mens_ativos, meta_mens)
     s_tick = sf(ticket_medio, meta_ticket)
-    k1, k2, k3, k4 = st.columns(4)
+    s_lucro = sf(receita_liquida, meta_lucro)
+    k1, k2, k3, k4, k5 = st.columns(5)
     for c, s, t, v, meta in [
         (k1, s_lav, "Lavagens no Mês", total_lav, meta_lav),
-        (k2, s_rec, "Receita Lavagens", f"R$ {receita_lav:,.2f}", f"R$ {meta_rec:,.0f}"),
+        (k2, s_rec, "Receita Bruta", f"R$ {receita_lav:,.2f}", f"R$ {meta_rec:,.0f}"),
         (k3, s_mens, "Mensalistas Ativos", mens_ativos, meta_mens),
-        (k4, s_tick, "Ticket Médio", f"R$ {ticket_medio:,.2f}", f"R$ {meta_ticket:,.0f}")
+        (k4, s_tick, "Ticket Médio", f"R$ {ticket_medio:,.2f}", f"R$ {meta_ticket:,.0f}"),
+        (k5, s_lucro, "💰 Receita Líquida", f"R$ {receita_liquida:,.2f}", f"R$ {meta_lucro:,.0f}")
     ]:
         c.markdown(f"""<div class="card-executivo {s}"><div class="kpi-label">{t}</div><div class="kpi-value">{v}</div><div class="kpi-meta">Meta: {meta}</div><div class="semaforo {s}">{s.upper()}</div></div>""", unsafe_allow_html=True)
     st.markdown("---")
@@ -937,6 +1097,7 @@ if is_admin:
                         with conn.cursor() as cur:
                             cur.execute("DELETE FROM lavagens")
                             cur.execute("DELETE FROM mensalistas")
+                            cur.execute("DELETE FROM despesas")
                             conn.commit()
                         st.success("✅ Todos os dados foram resetados com sucesso!")
                         st.balloons()
@@ -973,6 +1134,9 @@ with col_exp1:
                 lav_data.to_excel(writer, sheet_name='Lavagens', index=False)
             if 'df_mens' in dir() and not df_mens.empty:
                 df_mens.to_excel(writer, sheet_name='Mensalistas', index=False)
+            df_desp_exp = carregar_despesas(mes_sel, ano_sel)
+            if not df_desp_exp.empty:
+                df_desp_exp.to_excel(writer, sheet_name='Despesas', index=False)    
         output.seek(0)
         st.download_button(
             label="💾 Salvar arquivo",
