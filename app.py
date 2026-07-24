@@ -738,7 +738,7 @@ with tab2:
                     ep = st.text_input("Placa", value=row['placa'], key=f"ep_{idx}")
                     epl = st.selectbox("Plano", ["Valor Fixo Mensal","Pacote de Lavagens"], index=0 if row['plano']=="Valor Fixo Mensal" else 1, key=f"epl_{idx}")
                     ev = st.number_input("Valor", value=float(row['valor_plano']), key=f"ev_{idx}")
-                    ed = st.date_input("Data", value=datetime.strptime(row['data_inicio'],"%Y-%m-%d").date() if row['data_inicio'] else date.today(), key=f"ed_{idx}")
+                    ed = st.date_input("Data", value=row['data_inicio'] if row['data_inicio'] else date.today(), key=f"ed_{idx}")
                     ea = st.checkbox("Ativo", value=bool(row['ativo']), key=f"ea_{idx}")
                     if st.form_submit_button("💾 Salvar", use_container_width=True):
                         atualizar_mensalista(row['id'], en, et, etp, ep, epl, ev, ed.strftime("%Y-%m-%d"), 1 if ea else 0)
