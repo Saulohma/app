@@ -12,9 +12,9 @@ from hashlib import sha256
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-# 
+#
 # AUTENTICAÇÃO VIA BANCO
-# 
+#
 def check_password():
     if "auth" not in st.session_state:
         st.session_state.auth = False
@@ -75,9 +75,9 @@ def check_password():
                             st.error("E-mail já cadastrado!")
     return False
 
-# 
+#
 # CONFIG
-# 
+#
 st.set_page_config(
     page_title="Lava Jato",
     page_icon="🚗",
@@ -86,9 +86,9 @@ st.set_page_config(
     menu_items={},
 )
 
-# 
+#
 # BANCO DE DADOS
-# 
+#
 def get_conn():
     conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
     conn.autocommit = True
@@ -111,6 +111,15 @@ def init_db():
                 valor_plano NUMERIC, data_inicio DATE, ativo INTEGER DEFAULT 0
             )
         """)
+
+        # FIX 1: Corrige schema de tabelas existentes
+        try:
+            cur.execute("ALTER TABLE mensalistas ADD COLUMN IF NOT EXISTS valor_plano NUMERIC DEFAULT 0")
+            cur.execute("ALTER TABLE mensalistas ADD COLUMN IF NOT EXISTS telefone TEXT DEFAULT ''")
+            cur.execute("ALTER TABLE mensalistas ADD COLUMN IF NOT EXISTS plano TEXT DEFAULT 'Valor Fixo Mensal'")
+        except Exception:
+            pass
+
         cur.execute("""
             CREATE TABLE IF NOT EXISTS precos (
                 id SERIAL PRIMARY KEY, tipo_veiculo TEXT,
@@ -156,7 +165,6 @@ def migrar_excel():
         return
     conn = get_conn()
     cursor = conn.cursor()
-    # --- LAVAGENS ---
     xlsx = Path(__file__).parent / "dados.xlsx"
     if xlsx.exists():
         try:
@@ -190,7 +198,6 @@ def migrar_excel():
             conn.commit()
         except Exception as e:
             print(f"Migração lavagens: {e}")
-    # --- MENSALISTAS ---
     xlsxm = Path(__file__).parent / "mensalistas.xlsx"
     if xlsxm.exists():
         try:
@@ -225,7 +232,6 @@ def migrar_excel():
             conn.commit()
         except Exception as e:
             print(f"Migração mensalistas: {e}")
-    # --- PRECOS ---
     if not xlsx.exists() and not xlsxm.exists():
         precos_default = [
             ('Comum', 'Lavagem Simples', 20), ('Comum', 'Lavagem Completa', 35),
@@ -254,9 +260,9 @@ def limpar_dados_corrompidos():
     conn.commit()
     conn.close()
 
-# 
+#
 # SISTEMA DE USUÁRIOS
-# 
+#
 def fazer_hash(senha):
     return sha256(senha.encode('utf-8')).hexdigest()
 
@@ -397,7 +403,7 @@ def atualizar_mensalista(id, nome, telefone, tipo, placa, plano, valor_plano, da
     try:
         id_int = int(id)
     except (ValueError, TypeError):
-        st.error("ID inválido para atualização")
+        st.error("ID inválido")
         return
     conn = get_conn()
     with conn.cursor() as cur:
@@ -409,7 +415,7 @@ def toggle_mensalista(id):
     try:
         id_int = int(id)
     except (ValueError, TypeError):
-        st.error("ID inválido para alternar status")
+        st.error("ID inválido")
         return
     conn = get_conn()
     with conn.cursor() as cur:
@@ -424,7 +430,7 @@ def excluir_mensalista(id):
     try:
         id_int = int(id)
     except (ValueError, TypeError):
-        st.error("ID inválido para exclusão")
+        st.error("ID inválido")
         return
     conn = get_conn()
     with conn.cursor() as cur:
@@ -432,17 +438,17 @@ def excluir_mensalista(id):
     conn.commit()
     conn.close()
 
-# 
+#
 # INICIALIZAÇÃO
-# 
+#
 init_db()
 criar_admin_master()
 migrar_excel()
 limpar_dados_corrompidos()
 
-# 
+#
 # CSS
-# 
+#
 st.markdown("""
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -489,9 +495,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# 
+#
 # HEADER
-# 
+#
 col_logo, col_title = st.columns([1, 5])
 with col_logo:
     logo_path = Path(__file__).parent / "imagem" / "lj.jpeg"
@@ -507,9 +513,9 @@ st.markdown("---")
 if not check_password():
     st.stop()
 
-# 
+#
 # USUÁRIO LOGADO
-# 
+#
 usuario_nome = st.session_state.get('user_name', 'Usuário')
 usuario_role = st.session_state.get('user_role', 'cliente')
 usuario_id = st.session_state.get('user_id', 0)
@@ -527,9 +533,9 @@ st.markdown(f"""
 </div>
 """, unsafe_allow_html=True)
 
-# 
+#
 # MENU LATERAL
-# 
+#
 st.sidebar.markdown(f"### 🚗 Lava Jato")
 st.sidebar.markdown(f"👤 **{usuario_nome}**")
 st.sidebar.markdown(f"<span class=\"tag {'destaque' if is_admin else 'oportunidade'}\">{'🔧 MASTER' if is_admin else '👤 CLIENTE'}</span>", unsafe_allow_html=True)
@@ -609,7 +615,7 @@ with tab2:
         if st.form_submit_button("📥 Cadastrar", type="primary", use_container_width=True):
             if nome_m:
                 adicionar_mensalista(nome_m, tel_m, tipo_m, placa_m, plano_m, valor_m, data_m.strftime("%Y-%m-%d"))
-                st.success(f"✅ {nome_m} cadastrado como INATIVO")
+                st.success(f"✅ {nome_m} cadastrado como ATIVO")
                 st.rerun()
             else:
                 st.warning("Nome é obrigatório")
@@ -617,13 +623,18 @@ with tab2:
         df_mens = carregar_mensalistas()
         st.markdown("#### 📋 Mensalistas")
         if not df_mens.empty:
+            # FIX 2: verifica se valor_plano existe
+            if 'valor_plano' in df_mens.columns:
+                df_mens['valor_plano'] = pd.to_numeric(df_mens['valor_plano'], errors='coerce').fillna(0)
+            else:
+                df_mens['valor_plano'] = 0
+
             total = len(df_mens); ativos = len(df_mens[df_mens['ativo']==1]); inativos = total - ativos
             receita_mensal = pd.to_numeric(df_mens.loc[df_mens['ativo']==1, 'valor_plano'], errors='coerce').sum()
             mk1, mk2, mk3, mk4 = st.columns(4)
             mk1.metric("Total", total); mk2.metric("Ativos", ativos); mk3.metric("Inativos", inativos)
             mk4.metric("Receita Mensal", f"R${float(receita_mensal):,.0f}".replace(",","X").replace(".",",").replace("X","."))
     st.markdown("---")
-    df_mens['valor_plano'] = pd.to_numeric(df_mens['valor_plano'], errors='coerce').fillna(0)
     df_mens = df_mens.reset_index(drop=True)
     if df_mens.empty:
         st.info("Nenhum mensalista cadastrado.")
@@ -716,7 +727,6 @@ with tab3:
             st.info("Nenhuma lavagem com data válida.")
     else:
         st.info("Nenhuma lavagem registrada ainda.")
-
     mens_ativos = len(df_mens[df_mens['ativo'] == 1]) if not df_mens.empty else 0
     meta_lav = 20; meta_rec = 3000; meta_mens = 3; meta_ticket = 120
     def sf(v, m):
@@ -736,7 +746,6 @@ with tab3:
     ]:
         c.markdown(f"""<div class="card-executivo {s}"><div class="kpi-label">{t}</div><div class="kpi-value">{v}</div><div class="kpi-meta">Meta: {meta}</div><div class="semaforo {s}">{s.upper()}</div></div>""", unsafe_allow_html=True)
     st.markdown("---")
-
     if not df_filtro.empty and 'data' in df_filtro.columns:
         col1, col2 = st.columns(2)
         with col1:
@@ -792,7 +801,6 @@ with tab3:
                 ).properties(height=250)
                 st.altair_chart(chart, use_container_width=True)
                 st.markdown("---")
-
         st.markdown("##### 💡 Insights do Período")
         if not df_filtro.empty:
             col_i1, col_i2, col_i3 = st.columns(3)
@@ -839,7 +847,6 @@ with tab3:
 if is_admin:
     with tab4:
         st.markdown("#### ⚙️ Administração do Sistema")
-
         st.markdown("##### ➕ Criar Novo Usuário")
         with st.form("form_admin_user"):
             col_a1, col_a2 = st.columns(2)
@@ -863,7 +870,6 @@ if is_admin:
                 else:
                     st.warning("Preencha nome, e-mail e senha!")
         st.markdown("---")
-
         st.markdown("##### 👥 Usuários Cadastrados")
         df_users = carregar_usuarios()
         if not df_users.empty:
@@ -905,8 +911,6 @@ if is_admin:
                                     st.rerun()
         else:
             st.info("Nenhum usuário cadastrado.")
-
-        # ─── ZONA DE PERIGO ───
         st.markdown("---")
         st.markdown("##### ☢️ Zona de Perigo")
         with st.expander("⚠️ Resetar Todos os Dados do Sistema", expanded=False):
@@ -943,8 +947,6 @@ if is_admin:
                         conn.close()
                 else:
                     st.error("❌ Senha incorreta! Operação cancelada.")
-
-        # ─── ESTATÍSTICAS ───
         st.markdown("---")
         st.markdown("##### 📊 Estatísticas")
         if not df_users.empty:
@@ -956,9 +958,9 @@ if is_admin:
             c2.markdown(f"""<div class="card-executivo" style="border-left-color:#1e40af;"><div class="kpi-label">🔧 Master</div><div class="kpi-value">{total_admins}</div></div>""", unsafe_allow_html=True)
             c3.markdown(f"""<div class="card-executivo" style="border-left-color:#065f46;"><div class="kpi-label">👤 Clientes</div><div class="kpi-value">{total_clientes}</div></div>""", unsafe_allow_html=True)
 
-# 
+#
 # 📥 EXPORTAR RELATÓRIO
-# 
+#
 st.markdown("---")
 st.markdown("#### 📥 Exportar Relatório")
 col_exp1, col_exp2 = st.columns(2)
@@ -969,7 +971,7 @@ with col_exp1:
             lav_data = carregar_lavagens()
             if not lav_data.empty:
                 lav_data.to_excel(writer, sheet_name='Lavagens', index=False)
-            if not df_mens.empty:
+            if 'df_mens' in dir() and not df_mens.empty:
                 df_mens.to_excel(writer, sheet_name='Mensalistas', index=False)
         output.seek(0)
         st.download_button(
