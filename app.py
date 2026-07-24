@@ -48,11 +48,11 @@ def check_password():
         with col2:
             st.markdown("#### 🔐 Acesso Restrito")
             with st.form("login"):
-                email = st.text_input("E-mail", placeholder="seu@email.com")
+                nome_login = st.text_input("Nome de usuário", placeholder="Seu nome de login")
                 pwd = st.text_input("Senha", type="password", placeholder="Digite sua senha")
                 if st.form_submit_button("Entrar", type="primary", use_container_width=True):
-                    if email and pwd:
-                        user = autenticar_usuario(email, pwd)
+                    if nome_login and pwd:
+                        user = autenticar_usuario(nome_login, pwd)  # ← NOME, não email
                         if user:
                             st.session_state.auth = True
                             st.session_state.user_id = user['id']
@@ -60,9 +60,9 @@ def check_password():
                             st.session_state.user_role = user['role']
                             st.rerun()
                         else:
-                            st.error("❌ E-mail ou senha inválidos!")
+                            st.error("❌ Nome ou senha inválidos!")
                     else:
-                        st.warning("Preencha e-mail e senha.")
+                        st.warning("Preencha nome e senha.")
 
     with tab_cadastro:
         col1, col2, col3 = st.columns([1, 1.5, 1])
@@ -436,11 +436,11 @@ def criar_admin_master():
             conn.commit()
     conn.close()
 
-def autenticar_usuario(email, senha):
-    """Autentica o usuário no banco"""
+def autenticar_usuario(nome, senha):
+    """Autentica o usuário pelo NOME (não precisa de email)"""
     conn = get_conn()
     with conn.cursor() as cur:
-        cur.execute("SELECT id, nome, email, role, senha_hash FROM usuarios WHERE email = %s", (email,))
+        cur.execute("SELECT id, nome, email, role, senha_hash FROM usuarios WHERE nome = %s", (nome,))
         user = cur.fetchone()
     conn.close()
     if user and user['senha_hash'] == fazer_hash(senha):
@@ -463,7 +463,29 @@ def cadastrar_usuario(nome, email, telefone, senha, role="cliente"):
         return False
     finally:
         conn.close()
-
+def editar_usuario(user_id, novo_nome=None, novo_email=None, novo_telefone=None, novo_role=None, nova_senha=None):
+    """Edita dados de um usuário"""
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            if nova_senha:
+                hash_s = fazer_hash(nova_senha)
+                cur.execute("UPDATE usuarios SET senha_hash = %s WHERE id = %s", (hash_s, user_id))
+            if novo_nome:
+                cur.execute("UPDATE usuarios SET nome = %s WHERE id = %s", (novo_nome, user_id))
+            if novo_email:
+                cur.execute("UPDATE usuarios SET email = %s WHERE id = %s", (novo_email, user_id))
+            if novo_telefone:
+                cur.execute("UPDATE usuarios SET telefone = %s WHERE id = %s", (novo_telefone, user_id))
+            if novo_role:
+                cur.execute("UPDATE usuarios SET role = %s WHERE id = %s", (novo_role, user_id))
+            conn.commit()
+        return True
+    except Exception:
+        return False
+    finally:
+        conn.close()
+        
 def excluir_usuario(user_id):
     """Exclui um usuário (menos admin)"""
     conn = get_conn()
@@ -1080,33 +1102,43 @@ if is_admin:
                 role_tag = "🔧 MASTER" if row['role'] == 'admin' else "👤 Cliente"
                 cor_role = "#1e40af" if row['role'] == 'admin' else "#065f46"
 
-                st.markdown(f"""
-                <div style="background:white;border-radius:12px;padding:1rem;border:1px solid #e5e7eb;margin-bottom:0.5rem;">
-                    <div style="display:flex;justify-content:space-between;align-items:center;">
-                        <div>
-                            <strong>{row['nome']}</strong><br>
-                            <span style="color:#6b7280;font-size:0.85rem;">{row['email']}</span>
-                        </div>
-                        <div style="text-align:right;">
-                            <span style="color:{cor_role};font-weight:600;font-size:0.85rem;">{role_tag}</span>
-                        </div>
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-
-                # Botão excluir (não pode excluir admin)
-                if row['role'] != 'admin':
-                    if st.button(f"🗑️ Excluir {row['nome']}", key=f"del_user_{row['id']}", use_container_width=True):
-                        if excluir_usuario(int(row['id'])):
-                            st.success(f"✅ Usuário {row['nome']} excluído!")
-                            st.rerun()
-                        else:
-                            st.error("Erro ao excluir usuário.")
-                else:
-                    st.markdown("<p style='color:#9ca3af;font-size:0.8rem;'>🔒 Administradores não podem ser excluídos</p>", unsafe_allow_html=True)
-                st.markdown("---")
+                with st.expander(f"{row['nome']} — {role_tag}"):
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        novo_nome = st.text_input("Nome", value=row['nome'], key=f"nome_{row['id']}")
+                        novo_email = st.text_input("E-mail", value=row['email'], key=f"email_{row['id']}")
+                    with col2:
+                        novo_tel = st.text_input("Telefone", value=row.get('telefone',''), key=f"tel_{row['id']}")
+                        novo_role = st.selectbox("Tipo", ["cliente", "admin"],
+                            index=0 if row['role']=='cliente' else 1, key=f"role_{row['id']}")
+                    
+                    col_a, col_b, col_c = st.columns([2, 2, 1])
+                    with col_a:
+                        if st.button("💾 Salvar Alterações", key=f"save_{row['id']}", use_container_width=True):
+                            if editar_usuario(int(row['id']), novo_nome, novo_email, novo_tel, novo_role):
+                                st.success(f"✅ Usuário {novo_nome} atualizado!")
+                                st.rerun()
+                            else:
+                                st.error("Erro ao atualizar.")
+                    with col_b:
+                        with st.popover("🔑 Redefinir Senha"):
+                            nova_senha = st.text_input("Nova senha", type="password", key=f"pwd_{row['id']}")
+                            if st.button("Alterar Senha", key=f"pwd_btn_{row['id']}"):
+                                if nova_senha and len(nova_senha) >= 6:
+                                    editar_usuario(int(row['id']), nova_senha=nova_senha)
+                                    st.success("✅ Senha alterada!")
+                                    st.rerun()
+                                else:
+                                    st.warning("Mínimo 6 caracteres.")
+                    with col_c:
+                        if row['role'] != 'admin':
+                            if st.button("🗑️", key=f"del_{row['id']}"):
+                                if excluir_usuario(int(row['id'])):
+                                    st.success(f"Excluído!")
+                                    st.rerun()
         else:
             st.info("Nenhum usuário cadastrado.")
+
 
         st.markdown("---")
 
@@ -1120,7 +1152,51 @@ if is_admin:
             c1.markdown(f"""<div class="card-executivo verde"><div class="kpi-label">Total</div><div class="kpi-value">{total_users}</div></div>""", unsafe_allow_html=True)
             c2.markdown(f"""<div class="card-executivo" style="border-left-color:#1e40af;"><div class="kpi-label">🔧 Master</div><div class="kpi-value">{total_admins}</div></div>""", unsafe_allow_html=True)
             c3.markdown(f"""<div class="card-executivo" style="border-left-color:#065f46;"><div class="kpi-label">👤 Clientes</div><div class="kpi-value">{total_clientes}</div></div>""", unsafe_allow_html=True)        
+        
 
+        st.markdown("---")
+st.markdown("##### ☢️ Zona de Perigo")
+
+with st.expander("⚠️ Resetar Todos os Dados do Sistema", expanded=False):
+    st.warning("""
+    **Isso irá APAGAR TODOS OS DADOS** de lavagens, mensalistas e vendas.
+    Os usuários **NÃO** serão afetados.
+    Essa ação **NÃO PODE SER DESFEITA**.
+    """)
+    
+    col_r1, col_r2 = st.columns(2)
+    with col_r1:
+        confirmacao = st.text_input("Digite 'RESETAR' para confirmar", placeholder="RESETAR")
+    with col_r2:
+        senha_master = st.text_input("Digite SUA SENHA para autorizar", type="password", placeholder="Sua senha")
+    
+    if st.button("☢️ SIM, QUERO RESETAR TUDO", type="primary", use_container_width=True,
+                 disabled=(confirmacao != "RESETAR" or not senha_master)):
+        # Verifica a senha do master logado
+        conn = get_conn()
+        with conn.cursor() as cur:
+            cur.execute("SELECT senha_hash FROM usuarios WHERE id = %s AND role = 'admin'", (usuario_id,))
+            admin = cur.fetchone()
+        conn.close()
+        
+        if admin and admin['senha_hash'] == fazer_hash(senha_master):
+            conn = get_conn()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("DELETE FROM lavagens")
+                    cur.execute("DELETE FROM mensalistas")
+                    conn.commit()
+                st.success("✅ Todos os dados foram resetados com sucesso!")
+                st.balloons()
+                st.rerun()
+            except Exception as e:
+                st.error(f"Erro ao resetar: {e}")
+            finally:
+                conn.close()
+        else:
+            st.error("❌ Senha incorreta! Operação cancelada.")
+
+            
 # ============================================================
 # 📥 EXPORTAR RELATÓRIO
 # ============================================================
