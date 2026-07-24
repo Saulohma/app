@@ -17,14 +17,22 @@ DATABASE_URL = os.getenv("DATABASE_URL")   # ← ADICIONA ESTA LINHA
 # ============================================================
 # AUTENTICAÇÃO
 # ============================================================
-ADMIN_USER = "admin"
-ADMIN_PASS = "admin757"
+#ADMIN_USER = "admin"
+#ADMIN_PASS = "admin757"
 
+# ============================================================
+# AUTENTICAÇÃO VIA BANCO
+# ============================================================
 def check_password():
     if "auth" not in st.session_state:
         st.session_state.auth = False
+        st.session_state.user_id = None
+        st.session_state.user_name = None
+        st.session_state.user_role = None
+
     if st.session_state.auth:
         return True
+
     st.markdown(
         "<div style='text-align:center;padding:3rem 0 1rem 0;'>"
         "<h1>🚗 Lava Jato</h1>"
@@ -32,18 +40,52 @@ def check_password():
         "</div>",
         unsafe_allow_html=True
     )
-    col1, col2, col3 = st.columns([1, 1.5, 1])
-    with col2:
-        st.markdown("#### 🔐 Acesso Restrito")
-        with st.form("login"):
-            user = st.text_input("Usuário", placeholder="Digite seu usuário")
-            pwd = st.text_input("Senha", type="password", placeholder="Digite sua senha")
-            if st.form_submit_button("Entrar", type="primary", use_container_width=True):
-                if user == ADMIN_USER and pwd == ADMIN_PASS:
-                    st.session_state.auth = True
-                    st.rerun()
-                else:
-                    st.error("❌ Usuário ou senha inválidos!")
+
+    tab_login, tab_cadastro = st.tabs(["🔐 Entrar", "📝 Criar Conta"])
+
+    with tab_login:
+        col1, col2, col3 = st.columns([1, 1.5, 1])
+        with col2:
+            st.markdown("#### 🔐 Acesso Restrito")
+            with st.form("login"):
+                email = st.text_input("E-mail", placeholder="seu@email.com")
+                pwd = st.text_input("Senha", type="password", placeholder="Digite sua senha")
+                if st.form_submit_button("Entrar", type="primary", use_container_width=True):
+                    if email and pwd:
+                        user = autenticar_usuario(email, pwd)
+                        if user:
+                            st.session_state.auth = True
+                            st.session_state.user_id = user['id']
+                            st.session_state.user_name = user['nome']
+                            st.session_state.user_role = user['role']
+                            st.rerun()
+                        else:
+                            st.error("❌ E-mail ou senha inválidos!")
+                    else:
+                        st.warning("Preencha e-mail e senha.")
+
+    with tab_cadastro:
+        col1, col2, col3 = st.columns([1, 1.5, 1])
+        with col2:
+            st.markdown("#### 📝 Criar Conta de Cliente")
+            with st.form("cadastro"):
+                nome_c = st.text_input("Nome completo", placeholder="Seu nome")
+                email_c = st.text_input("E-mail", placeholder="seu@email.com")
+                tel_c = st.text_input("Telefone", placeholder="(99) 99999-9999")
+                senha_c = st.text_input("Senha", type="password", placeholder="Mínimo 6 caracteres")
+                senha_c2 = st.text_input("Confirmar senha", type="password")
+                if st.form_submit_button("Cadastrar", type="primary", use_container_width=True):
+                    if not nome_c or not email_c or not senha_c:
+                        st.warning("Preencha nome, e-mail e senha!")
+                    elif senha_c != senha_c2:
+                        st.warning("Senhas não conferem!")
+                    elif len(senha_c) < 6:
+                        st.warning("Senha precisa ter no mínimo 6 caracteres!")
+                    else:
+                        if cadastrar_usuario(nome_c, email_c, tel_c, senha_c, "cliente"):
+                            st.success("✅ Conta criada! Vá em 'Entrar' e faça login.")
+                        else:
+                            st.error("E-mail já cadastrado!")
     return False
 
 # ============================================================
@@ -236,6 +278,17 @@ def init_db():
                 id SERIAL PRIMARY KEY, concluida BOOLEAN DEFAULT TRUE
             )
         """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS usuarios (
+                id SERIAL PRIMARY KEY,
+                nome TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                telefone TEXT DEFAULT '',
+                senha_hash TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'cliente',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
     conn.commit()
     conn.close()
 
@@ -362,6 +415,78 @@ def limpar_dados_corrompidos():
         cur.execute("DELETE FROM precos WHERE tipo_veiculo IS NULL OR tipo_veiculo = ''")
     conn.commit()
     conn.close()
+# ============================================================
+# SISTEMA DE USUÁRIOS
+# ============================================================
+def fazer_hash(senha):
+    """Cria hash SHA-256 da senha"""
+    return sha256(senha.encode('utf-8')).hexdigest()
+
+def criar_admin_master():
+    """Cria o admin master se não existir"""
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("SELECT COUNT(*) AS total FROM usuarios WHERE role = 'admin'")
+        if list(cur.fetchone().values())[0] == 0:
+            hash_senha = fazer_hash("admin757")
+            cur.execute(
+                "INSERT INTO usuarios (nome, email, senha_hash, role) VALUES (%s, %s, %s, %s)",
+                ("Administrador", "admin@lavajato.com", hash_senha, "admin")
+            )
+            conn.commit()
+    conn.close()
+
+def autenticar_usuario(email, senha):
+    """Autentica o usuário no banco"""
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, nome, email, role, senha_hash FROM usuarios WHERE email = %s", (email,))
+        user = cur.fetchone()
+    conn.close()
+    if user and user['senha_hash'] == fazer_hash(senha):
+        return user
+    return None
+
+def cadastrar_usuario(nome, email, telefone, senha, role="cliente"):
+    """Cadastra um novo usuário"""
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            hash_s = fazer_hash(senha)
+            cur.execute(
+                "INSERT INTO usuarios (nome, email, telefone, senha_hash, role) VALUES (%s, %s, %s, %s, %s)",
+                (nome, email, telefone, hash_s, role)
+            )
+            conn.commit()
+        return True
+    except Exception:
+        return False
+    finally:
+        conn.close()
+
+def excluir_usuario(user_id):
+    """Exclui um usuário (menos admin)"""
+    conn = get_conn()
+    try:
+        with conn.cursor() as cur:
+            cur.execute("DELETE FROM usuarios WHERE id = %s AND role != 'admin'", (user_id,))
+            conn.commit()
+        return True
+    except Exception:
+        return False
+    finally:
+        conn.close()
+
+def carregar_usuarios():
+    """Retorna DataFrame com todos os usuários"""
+    conn = get_conn()
+    with conn.cursor() as cur:
+        cur.execute("SELECT id, nome, email, telefone, role, created_at FROM usuarios ORDER BY id")
+        rows = cur.fetchall()
+    conn.close()
+    if not rows:
+        return pd.DataFrame()
+    return pd.DataFrame(rows)
 
 def get_preco(tipo_veiculo, servico):
     """Retorna o valor do serviço para o tipo de veículo"""
@@ -469,8 +594,9 @@ def excluir_mensalista(id):
     conn.close()
 
 init_db()
+criar_admin_master()   # ← NOVO: cria admin master
 migrar_excel()
-limpar_dados_corrompidos() 
+limpar_dados_corrompidos()
 # ============================================================
 # CSS
 # ============================================================
@@ -537,11 +663,51 @@ st.markdown("---")
 
 if not check_password():
     st.stop()
+# ============================================================
+# USUÁRIO LOGADO
+# ============================================================
+usuario_nome = st.session_state.get('user_name', 'Usuário')
+usuario_role = st.session_state.get('user_role', 'cliente')
+usuario_id = st.session_state.get('user_id', 0)
+is_admin = (usuario_role == 'admin')
 
+# Mostra quem está logado
+st.markdown(f"""
+<div style="display:flex;justify-content:space-between;align-items:center;background:#f8fafc;border-radius:12px;padding:0.5rem 1rem;margin-bottom:0.5rem;">
+    <div>
+        <span style="font-weight:600;">👤 {usuario_nome}</span>
+        <span class="tag {'destaque' if is_admin else 'oportunidade'}">{'🔧 MASTER' if is_admin else '👤 CLIENTE'}</span>
+    </div>
+    <div>
+        <span style="color:#6b7280;font-size:0.85rem;">{st.session_state.get('user_email','')}</span>
+    </div>
+</div>
+""", unsafe_allow_html=True)
 # ============================================================
 # ABAS
 # ============================================================
-tab1, tab2, tab3 = st.tabs(["📝 Registrar Lavagem", "👥 Mensalistas", "📊 Análises Executivas"])
+# ============================================================
+# MENU LATERAL
+# ============================================================
+st.sidebar.markdown(f"### 🚗 Lava Jato")
+st.sidebar.markdown(f"👤 **{usuario_nome}**")
+st.sidebar.markdown(f"<span class=\"tag {'destaque' if is_admin else 'oportunidade'}\">{'🔧 MASTER' if is_admin else '👤 CLIENTE'}</span>", unsafe_allow_html=True)
+st.sidebar.markdown("---")
+
+if st.sidebar.button("🚪 Sair", use_container_width=True):
+    st.session_state.auth = False
+    st.session_state.user_id = None
+    st.session_state.user_name = None
+    st.session_state.user_role = None
+    st.rerun()
+
+st.sidebar.markdown("---")
+
+# Abas principais
+if is_admin:
+    tab1, tab2, tab3, tab4 = st.tabs(["📝 Registrar Lavagem", "👥 Mensalistas", "📊 Análises Executivas", "⚙️ Admin"])
+else:
+    tab1, tab2, tab3 = st.tabs(["📝 Registrar Lavagem", "👥 Mensalistas", "📊 Análises Executivas"])
 
 # -------- ABA 1: REGISTRAR LAVAGEM --------
 with tab1:
@@ -874,7 +1040,86 @@ with tab3:
         else:
             st.info("Nenhum dado disponível para gerar insights no período selecionado.")
 
-        
+# -------- ABA 4: ADMIN (só para MASTER) --------
+if is_admin:
+    with tab4:
+        st.markdown("#### ⚙️ Administração do Sistema")
+
+        # ─── CRIAR USUÁRIO ───
+        st.markdown("##### ➕ Criar Novo Usuário")
+        with st.form("form_admin_user"):
+            col_a1, col_a2 = st.columns(2)
+            with col_a1:
+                a_nome = st.text_input("Nome completo", placeholder="Nome")
+                a_email = st.text_input("E-mail", placeholder="email@exemplo.com")
+            with col_a2:
+                a_tel = st.text_input("Telefone", placeholder="(99) 99999-9999")
+                a_senha = st.text_input("Senha", type="password", placeholder="Mín 6 caracteres")
+            a_role = st.selectbox("Tipo de usuário", ["cliente", "admin"])
+            if st.form_submit_button("📥 Criar Usuário", type="primary", use_container_width=True):
+                if a_nome and a_email and a_senha:
+                    if len(a_senha) >= 6:
+                        if cadastrar_usuario(a_nome, a_email, a_tel, a_senha, a_role):
+                            st.success(f"✅ Usuário {a_nome} criado com sucesso!")
+                            st.rerun()
+                        else:
+                            st.error("E-mail já cadastrado!")
+                    else:
+                        st.warning("Senha precisa ter no mínimo 6 caracteres!")
+                else:
+                    st.warning("Preencha nome, e-mail e senha!")
+
+        st.markdown("---")
+
+        # ─── LISTAR USUÁRIOS ───
+        st.markdown("##### 👥 Usuários Cadastrados")
+        df_users = carregar_usuarios()
+
+        if not df_users.empty:
+            for _, row in df_users.iterrows():
+                role_tag = "🔧 MASTER" if row['role'] == 'admin' else "👤 Cliente"
+                cor_role = "#1e40af" if row['role'] == 'admin' else "#065f46"
+
+                st.markdown(f"""
+                <div style="background:white;border-radius:12px;padding:1rem;border:1px solid #e5e7eb;margin-bottom:0.5rem;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div>
+                            <strong>{row['nome']}</strong><br>
+                            <span style="color:#6b7280;font-size:0.85rem;">{row['email']}</span>
+                        </div>
+                        <div style="text-align:right;">
+                            <span style="color:{cor_role};font-weight:600;font-size:0.85rem;">{role_tag}</span>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+
+                # Botão excluir (não pode excluir admin)
+                if row['role'] != 'admin':
+                    if st.button(f"🗑️ Excluir {row['nome']}", key=f"del_user_{row['id']}", use_container_width=True):
+                        if excluir_usuario(int(row['id'])):
+                            st.success(f"✅ Usuário {row['nome']} excluído!")
+                            st.rerun()
+                        else:
+                            st.error("Erro ao excluir usuário.")
+                else:
+                    st.markdown("<p style='color:#9ca3af;font-size:0.8rem;'>🔒 Administradores não podem ser excluídos</p>", unsafe_allow_html=True)
+                st.markdown("---")
+        else:
+            st.info("Nenhum usuário cadastrado.")
+
+        st.markdown("---")
+
+        # ─── ESTATÍSTICAS ───
+        st.markdown("##### 📊 Estatísticas")
+        if not df_users.empty:
+            total_users = len(df_users)
+            total_admins = len(df_users[df_users['role'] == 'admin'])
+            total_clientes = len(df_users[df_users['role'] == 'cliente'])
+            c1, c2, c3 = st.columns(3)
+            c1.markdown(f"""<div class="card-executivo verde"><div class="kpi-label">Total</div><div class="kpi-value">{total_users}</div></div>""", unsafe_allow_html=True)
+            c2.markdown(f"""<div class="card-executivo" style="border-left-color:#1e40af;"><div class="kpi-label">🔧 Master</div><div class="kpi-value">{total_admins}</div></div>""", unsafe_allow_html=True)
+            c3.markdown(f"""<div class="card-executivo" style="border-left-color:#065f46;"><div class="kpi-label">👤 Clientes</div><div class="kpi-value">{total_clientes}</div></div>""", unsafe_allow_html=True)        
 
 # ============================================================
 # 📥 EXPORTAR RELATÓRIO
