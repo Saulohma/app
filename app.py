@@ -891,7 +891,7 @@ with tab3:
     def sf(v, m):
         if v >= m: return "verde"
         elif v >= m * 0.7: return "amarelo"
-        else: return "vermelho
+        else: return "vermelho"
     s_lav = sf(total_lav, meta_lav)
     s_rec = sf(receita_lav, meta_rec)
     s_mens = sf(mens_ativos, meta_mens)
