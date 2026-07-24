@@ -66,7 +66,7 @@ def check_password():
                         st.warning("Preencha nome, e-mail e senha!")
                     elif senha_c != senha_c2:
                         st.warning("Senhas não conferem!")
-                    elif len(senha_c) &lt; 6:
+                    elif len(senha_c) < 6:
                         st.warning("Senha precisa ter no mínimo 6 caracteres!")
                     else:
                         if cadastrar_usuario(nome_c, email_c, tel_c, senha_c, "cliente"):
