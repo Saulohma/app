@@ -622,10 +622,9 @@ st.sidebar.markdown("---")
 
 # Abas principais
 if is_admin:
-    tab1, tab2, tab3, tab4, tab5 = st.tabs(["📝 Registrar Lavagem", "👥 Mensalistas", "💰 Despesas", "📊 Análises Executivas", "⚙️ Admin"])
+    tab_registrar, tab_mensalistas, tab_despesas, tab_analises, tab_admin = st.tabs(["📝 Registrar Lavagem", "👥 Mensalistas", "💰 Despesas", "📊 Análises Executivas", "⚙️ Admin"])
 else:
-    tab1, tab2, tab3, tab4 = st.tabs(["📝 Registrar Lavagem", "👥 Mensalistas", "💰 Despesas", "📊 Análises Executivas"])
-
+    tab_registrar, tab_mensalistas, tab_despesas, tab_analises = st.tabs(["📝 Registrar Lavagem", "👥 Mensalistas", "💰 Despesas", "📊 Análises Executivas"])
 # -------- ABA 1: REGISTRAR LAVAGEM --------
 with tab1:
     col_form, col_history = st.columns([1, 1.5])
