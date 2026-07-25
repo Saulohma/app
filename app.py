@@ -626,7 +626,7 @@ if is_admin:
 else:
     tab_registrar, tab_mensalistas, tab_despesas, tab_analises = st.tabs(["📝 Registrar Lavagem", "👥 Mensalistas", "💰 Despesas", "📊 Análises Executivas"])
 # -------- ABA 1: REGISTRAR LAVAGEM --------
-with tab1:
+with tab_registrar:
     col_form, col_history = st.columns([1, 1.5])
     with col_form:
         st.markdown("#### ✏️ Dados da Lavagem")
@@ -666,7 +666,7 @@ with tab1:
             st.info("Nenhuma lavagem registrada ainda.")
 
 # -------- ABA 2: MENSALISTAS --------
-with tab2:
+with tab_mensalistas:
     col_cad, col_lista = st.columns([1, 2])
     with col_cad:
         st.markdown("#### ➕ Novo Mensalista")
@@ -746,7 +746,7 @@ with tab2:
             st.markdown("---")
 
 # -------- ABA 3 (ou 4): DESPESAS --------
-aba_despesas = tab3 if not is_admin else tab3
+aba_despesas = tab_despesas
 with aba_despesas:
     st.markdown("#### 💰 Controle de Despesas")
 
@@ -828,7 +828,7 @@ with aba_despesas:
         st.info("Nenhuma despesa registrada para este período.")
 
 # -------- ABA 3: ANÁLISES EXECUTIVAS --------
-with tab3:
+with tab_analises:
     st.markdown("#### 📊 Análises Executivas")
     df_lav = carregar_lavagens()
     df_mens = carregar_mensalistas()
@@ -997,7 +997,7 @@ with tab3:
 
 # -------- ABA 4: ADMIN (só para MASTER) --------
 if is_admin:
-    with tab4:
+    with tab_admin:
         st.markdown("#### ⚙️ Administração do Sistema")
         st.markdown("##### ➕ Criar Novo Usuário")
         with st.form("form_admin_user"):
