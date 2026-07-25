@@ -993,30 +993,53 @@ with tab_analises:
                     st.bar_chart(df_dia_sem.set_index('dia')['quantidade'], use_container_width=True)
             with col_c2:
                 st.markdown("##### 📊 Receita Líquida Mensal")
-                # Usa TODOS os dados (df_lav), não só o filtro
-                if not df_lav.empty:
-                    df_todos = df_lav[df_lav['data_raw'].notna()].copy()
-                    df_todos['mes_ano'] = df_todos['data_raw'].dt.strftime('%Y-%m')
 
-                    # Agrupa lavagens por mês
-                    df_mensal = df_todos.groupby('mes_ano').agg(
-                        receita_lav=('valor', 'sum')
-                    ).reset_index()
+                # Gera lista de meses com base nos dados disponíveis
+                meses_lista = set()
 
-                    # Adiciona receita fixa dos mensalistas por mês
+                # Meses com lavagens
+                if not df_lav.empty and 'data_raw' in df_lav.columns:
+                    df_tmp = df_lav[df_lav['data_raw'].notna()].copy()
+                    meses_lista.update(df_tmp['data_raw'].dt.strftime('%Y-%m').unique())
+
+                # Meses com despesas
+                conn = get_conn()
+                with conn.cursor() as cur:
+                    cur.execute("SELECT DISTINCT ano, mes FROM despesas ORDER BY ano, mes")
+                    for r in cur.fetchall():
+                        meses_lista.add(f"{r['ano']}-{int(r['mes']):02d}")
+                conn.close()
+
+                # Mês atual (julho 2026)
+                meses_lista.add("2026-07")
+
+                if meses_lista:
+                    meses_ordenados = sorted(meses_lista)
+                    dados_grafico = []
+
+                    # Receita fixa dos mensalistas ativos
                     rec_mens = 0
                     if not df_mens.empty:
                         mask = df_mens['ativo'] == 1
                         if mask.any():
                             rec_mens = pd.to_numeric(df_mens.loc[mask, 'valor_plano'], errors='coerce').sum()
 
-                    # Calcula líquida
-                    for i, row in df_mensal.iterrows():
-                        a, m = row['mes_ano'].split('-')
-                        desp = total_despesas(int(m), int(a))
-                        df_mensal.loc[i, 'liquida'] = row['receita_lav'] + rec_mens - desp
+                    for mes_ano in meses_ordenados:
+                        a, m = mes_ano.split('-')
 
-                    df_mensal = df_mensal.sort_values('mes_ano')
+                        # Receita de lavagens do mês
+                        rec_lav = 0
+                        if not df_lav.empty and 'data_raw' in df_lav.columns:
+                            mask_lav = (df_lav['data_raw'].dt.year == int(a)) & (df_lav['data_raw'].dt.month == int(m))
+                            rec_lav = float(df_lav.loc[mask_lav, 'valor'].sum()) if mask_lav.any() else 0
+
+                        # Despesas do mês
+                        desp = total_despesas(int(m), int(a))
+
+                        liquida = rec_lav + rec_mens - desp
+                        dados_grafico.append({'mes_ano': mes_ano, 'liquida': liquida})
+
+                    df_mensal = pd.DataFrame(dados_grafico)
 
                     if not df_mensal.empty:
                         import altair as alt
@@ -1030,9 +1053,9 @@ with tab_analises:
                         ).properties(height=250)
                         st.altair_chart(chart, use_container_width=True)
                     else:
-                        st.info("Sem dados mensais.")
+                        st.info("Sem dados para exibir.")
                 else:
-                    st.info("Sem dados de receita.")
+                    st.info("Sem dados para exibir.")
 
                
         else:
