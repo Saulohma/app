@@ -901,26 +901,14 @@ with tab3:
 
     mens_ativos = len(df_mens[df_mens['ativo'] == 1]) if not df_mens.empty else 0
 
-            
-    
-    def sf(v, m):
-        if v >= m: return "verde"
-        elif v >= m * 0.7: return "amarelo"
-        else: return "vermelho"
-    s_lav = sf(total_lav, meta_lav)
-    s_rec = sf(receita_lav, meta_rec)
-    s_mens = sf(mens_ativos, meta_mens)
-    s_tick = sf(ticket_medio, meta_ticket)
-    s_lucro = sf(receita_liquida, meta_lucro)
     k1, k2, k3, k4, k5 = st.columns(5)
-    for c, s, t, v, meta in [
-        (k1, s_lav, "Lavagens no Mês", total_lav, meta_lav),
-        (k2, s_rec, "Receita Bruta", f"R$ {receita_lav:,.2f}", f"R$ {meta_rec:,.0f}"),
-        (k3, s_mens, "Mensalistas Ativos", mens_ativos, meta_mens),
-        (k4, s_tick, "Ticket Médio", f"R$ {ticket_medio:,.2f}", f"R$ {meta_ticket:,.0f}"),
-        (k5, s_lucro, "💰 Receita Líquida", f"R$ {receita_liquida:,.2f}", f"R$ {meta_lucro:,.0f}")
-    ]:
-        c.markdown(f"""<div class="card-executivo {s}"><div class="kpi-label">{t}</div><div class="kpi-value">{v}</div><div class="kpi-meta">Meta: {meta}</div><div class="semaforo {s}">{s.upper()}</div></div>""", unsafe_allow_html=True)
+    k1.markdown(f"""<div class="card-executivo"><div class="kpi-label">🧼 Lavagens no Mês</div><div class="kpi-value">{total_lav}</div></div>""", unsafe_allow_html=True)
+    k2.markdown(f"""<div class="card-executivo"><div class="kpi-label">💰 Receita Bruta</div><div class="kpi-value">R$ {receita_bruta:,.2f}</div></div>""", unsafe_allow_html=True)
+    k3.markdown(f"""<div class="card-executivo"><div class="kpi-label">👥 Mensalistas Ativos</div><div class="kpi-value">{mens_ativos}</div></div>""", unsafe_allow_html=True)
+    k4.markdown(f"""<div class="card-executivo"><div class="kpi-label">🎯 Ticket Médio</div><div class="kpi-value">R$ {ticket_medio:,.2f}</div></div>""", unsafe_allow_html=True)
+    k5.markdown(f"""<div class="card-executivo"><div class="kpi-label">📊 Receita Líquida</div><div class="kpi-value">R$ {receita_liquida:,.2f}</div></div>""", unsafe_allow_html=True)
+
+    
     st.markdown("---")
     if not df_filtro.empty and 'data' in df_filtro.columns:
         col1, col2 = st.columns(2)
