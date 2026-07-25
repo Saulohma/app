@@ -874,17 +874,29 @@ with tab3:
             total_lav = qtd_total_lav
             receita_lav = float(df_filtro['valor'].sum()) if not df_filtro.empty else 0
             ticket_medio = receita_lav / qtd_total_lav if qtd_total_lav > 0 else 0
+
+            # Soma receita dos mensalistas ativos
+            if not df_mens.empty:
+                mens_ativos_mask = df_mens['ativo'] == 1
+                if mens_ativos_mask.any():
+                    receita_mensalistas = pd.to_numeric(df_mens.loc[mens_ativos_mask, 'valor_plano'], errors='coerce').sum()
+                else:
+                    receita_mensalistas = 0
+            else:
+                receita_mensalistas = 0
+
+            receita_bruta = receita_lav + receita_mensalistas
         else:
             st.info("Nenhuma lavagem com data válida.")
     else:
         st.info("Nenhuma lavagem registrada ainda.")
 
-    # Despesas do período selecionado
+        # Despesas do período selecionado
     if mes_sel is not None and ano_sel is not None:
         total_desp = total_despesas(int(mes_sel), ano_sel)
     else:
         total_desp = 0
-    receita_liquida = receita_lav - total_desp
+    receita_liquida = receita_bruta - total_desp
 
     mens_ativos = len(df_mens[df_mens['ativo'] == 1]) if not df_mens.empty else 0
     meta_lav = 20; meta_rec = 3000; meta_mens = 3; meta_ticket = 120; meta_lucro = 2000
