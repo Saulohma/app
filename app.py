@@ -991,6 +991,49 @@ with tab_analises:
                 if not df_dia_sem.empty:
                     df_dia_sem['dia'] = df_dia_sem['dia_semana'].map(dias_nomes)
                     st.bar_chart(df_dia_sem.set_index('dia')['quantidade'], use_container_width=True)
+            with col_c2:
+                st.markdown("##### 📊 Receita Líquida Mensal")
+                # Usa TODOS os dados (df_lav), não só o filtro
+                if not df_lav.empty:
+                    df_todos = df_lav[df_lav['data_raw'].notna()].copy()
+                    df_todos['mes_ano'] = df_todos['data_raw'].dt.strftime('%Y-%m')
+
+                    # Agrupa lavagens por mês
+                    df_mensal = df_todos.groupby('mes_ano').agg(
+                        receita_lav=('valor', 'sum')
+                    ).reset_index()
+
+                    # Adiciona receita fixa dos mensalistas por mês
+                    rec_mens = 0
+                    if not df_mens.empty:
+                        mask = df_mens['ativo'] == 1
+                        if mask.any():
+                            rec_mens = pd.to_numeric(df_mens.loc[mask, 'valor_plano'], errors='coerce').sum()
+
+                    # Calcula líquida
+                    for i, row in df_mensal.iterrows():
+                        a, m = row['mes_ano'].split('-')
+                        desp = total_despesas(int(m), int(a))
+                        df_mensal.loc[i, 'liquida'] = row['receita_lav'] + rec_mens - desp
+
+                    df_mensal = df_mensal.sort_values('mes_ano')
+
+                    if not df_mensal.empty:
+                        import altair as alt
+                        chart = alt.Chart(df_mensal).mark_bar(color='#10b981', size=25).encode(
+                            x=alt.X('mes_ano:N', title='', sort=None, axis=alt.Axis(labelAngle=-45)),
+                            y=alt.Y('liquida:Q', title='R$'),
+                            tooltip=[
+                                alt.Tooltip('mes_ano:N', title='Mês'),
+                                alt.Tooltip('liquida:Q', title='Receita Líquida', format='R$,.2f')
+                            ]
+                        ).properties(height=250)
+                        st.altair_chart(chart, use_container_width=True)
+                    else:
+                        st.info("Sem dados mensais.")
+                else:
+                    st.info("Sem dados de receita.")
+
                
         else:
             st.info("Nenhum dado disponível para gerar insights no período selecionado.")
