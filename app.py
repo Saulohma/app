@@ -89,32 +89,12 @@ st.set_page_config(
 #
 # BANCO DE DADOS
 #
-from psycopg2 import pool
-
-try:
-    connection_pool = psycopg2.pool.SimpleConnectionPool(1, 10, DATABASE_URL)
-except Exception as e:
-    st.error(f"Erro ao criar pool: {e}")
-    connection_pool = None
-
 def get_conn():
-    if connection_pool:
-        conn = connection_pool.getconn()
-        conn.autocommit = True
-        return conn
     conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
     conn.autocommit = True
     return conn
 
-def put_conn(conn):
-    if connection_pool:
-        connection_pool.putconn(conn)
-    else:
-        conn.close()
-
 def init_db():
-    if 'db_inicializado' in st.session_state and st.session_state.db_inicializado:
-        return
     conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("""
@@ -131,23 +111,15 @@ def init_db():
                 valor_plano NUMERIC, data_inicio DATE, ativo INTEGER DEFAULT 0
             )
         """)
+
+        # FIX 1: Corrige schema de tabelas existentes
         try:
             cur.execute("ALTER TABLE mensalistas ADD COLUMN IF NOT EXISTS valor_plano NUMERIC DEFAULT 0")
             cur.execute("ALTER TABLE mensalistas ADD COLUMN IF NOT EXISTS telefone TEXT DEFAULT ''")
             cur.execute("ALTER TABLE mensalistas ADD COLUMN IF NOT EXISTS plano TEXT DEFAULT 'Valor Fixo Mensal'")
-            cur.execute("ALTER TABLE mensalistas ADD COLUMN IF NOT EXISTS data_inicio DATE")
-        except:
+        except Exception:
             pass
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS despesas (
-                id SERIAL PRIMARY KEY, data DATE, categoria TEXT,
-                valor NUMERIC, descricao TEXT, mes INTEGER, ano INTEGER
-            )
-        """)
-        try:
-            cur.execute("ALTER TABLE despesas ADD COLUMN IF NOT EXISTS descricao TEXT DEFAULT ''")
-        except:
-            pass
+
         cur.execute("""
             CREATE TABLE IF NOT EXISTS precos (
                 id SERIAL PRIMARY KEY, tipo_veiculo TEXT,
@@ -155,16 +127,42 @@ def init_db():
             )
         """)
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS usuarios (
-                id SERIAL PRIMARY KEY, nome TEXT, email TEXT UNIQUE,
-                senha_hash TEXT, role TEXT DEFAULT 'operador'
+            CREATE TABLE IF NOT EXISTS _migracao_feita (
+                id SERIAL PRIMARY KEY, concluida BOOLEAN DEFAULT TRUE
             )
         """)
-    put_conn(conn)
-    st.session_state.db_inicializado = True
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS usuarios (
+                id SERIAL PRIMARY KEY,
+                nome TEXT NOT NULL,
+                email TEXT UNIQUE NOT NULL,
+                telefone TEXT DEFAULT '',
+                senha_hash TEXT NOT NULL,
+                role TEXT NOT NULL DEFAULT 'cliente',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS despesas (
+                id SERIAL PRIMARY KEY,
+                categoria TEXT NOT NULL,
+                descricao TEXT DEFAULT '',
+                valor NUMERIC NOT NULL,
+                mes INTEGER NOT NULL,
+                ano INTEGER NOT NULL,
+                data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        # Corrige schema de tabelas existentes
+        try:
+            cur.execute("ALTER TABLE despesas ADD COLUMN IF NOT EXISTS descricao TEXT DEFAULT ''")
+        except Exception:
+            pass
+    conn.commit()
+    conn.close()
 
 def migracao_ja_feita():
-    conn = put_conn(conn)
+    conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("SELECT COUNT(*) AS total FROM _migracao_feita")
         r = cur.fetchone()
@@ -181,7 +179,7 @@ def is_header_row(r, col_names):
 def migrar_excel():
     if migracao_ja_feita():
         return
-    conn = put_conn(conn)
+    conn = get_conn()
     cursor = conn.cursor()
     xlsx = Path(__file__).parent / "dados.xlsx"
     if xlsx.exists():
@@ -267,7 +265,7 @@ def migrar_excel():
     conn.close()
 
 def limpar_dados_corrompidos():
-    conn = put_conn(conn)
+    conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("DELETE FROM lavagens WHERE cliente IS NULL OR cliente = '' OR cliente = 'cliente'")
         cur.execute("DELETE FROM lavagens WHERE data IS NULL")
@@ -285,7 +283,7 @@ def fazer_hash(senha):
     return sha256(senha.encode('utf-8')).hexdigest()
 
 def criar_admin_master():
-    conn = get_conn(conn)
+    conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("SELECT COUNT(*) AS total FROM usuarios WHERE role = 'admin'")
         if list(cur.fetchone().values())[0] == 0:
@@ -298,7 +296,7 @@ def criar_admin_master():
     conn.close()
 
 def autenticar_usuario(nome, senha):
-    conn = put_conn(conn)
+    conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("SELECT id, nome, email, role, senha_hash FROM usuarios WHERE nome = %s", (nome,))
         user = cur.fetchone()
@@ -308,7 +306,7 @@ def autenticar_usuario(nome, senha):
     return None
 
 def cadastrar_usuario(nome, email, telefone, senha, role="cliente"):
-    conn = put_conn(conn)
+    conn = get_conn()
     try:
         with conn.cursor() as cur:
             hash_s = fazer_hash(senha)
@@ -324,7 +322,7 @@ def cadastrar_usuario(nome, email, telefone, senha, role="cliente"):
         conn.close()
 
 def editar_usuario(user_id, novo_nome=None, novo_email=None, novo_telefone=None, novo_role=None, nova_senha=None):
-    conn = put_conn(conn)
+    conn = get_conn()
     try:
         with conn.cursor() as cur:
             if nova_senha:
@@ -346,7 +344,7 @@ def editar_usuario(user_id, novo_nome=None, novo_email=None, novo_telefone=None,
         conn.close()
 
 def excluir_usuario(user_id):
-    conn = put_conn(conn)
+    conn = get_conn()
     try:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM usuarios WHERE id = %s AND role != 'admin'", (user_id,))
@@ -358,7 +356,7 @@ def excluir_usuario(user_id):
         conn.close()
 
 def carregar_usuarios():
-    conn = put_conn(conn)
+    conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("SELECT id, nome, email, telefone, role, created_at FROM usuarios ORDER BY id")
         rows = cur.fetchall()
@@ -368,7 +366,7 @@ def carregar_usuarios():
     return pd.DataFrame(rows)
 
 def get_preco(tipo_veiculo, servico):
-    conn = put_conn(conn)
+    conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("SELECT valor FROM precos WHERE tipo_veiculo=%s AND servico=%s", (tipo_veiculo, servico))
         r = cur.fetchone()
@@ -382,9 +380,9 @@ def get_preco(tipo_veiculo, servico):
         ('Moto', 'Lavagem Simples'): 15, ('Moto', 'Lavagem Completa'): 25,
     }
     return precos_fallback.get((tipo_veiculo, servico), 0)
-@st.cache_data(ttl=60)
+
 def carregar_lavagens():
-    conn = put_conn(conn)
+    conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("SELECT *, TO_CHAR(data, 'DD/MM/YYYY HH24:MI') AS data_formatada FROM lavagens ORDER BY data DESC")
         rows = cur.fetchall()
@@ -392,9 +390,9 @@ def carregar_lavagens():
     if not rows:
         return pd.DataFrame()
     return pd.DataFrame(rows)
-@st.cache_data(ttl=60)
+
 def carregar_mensalistas():
-    conn = put_conn(conn)
+    conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("SELECT * FROM mensalistas ORDER BY nome")
         rows = cur.fetchall()
@@ -404,14 +402,14 @@ def carregar_mensalistas():
     return pd.DataFrame(rows)
 
 def registrar_lavagem(data, tipo_veiculo, servico, valor, cliente, placa, quantidade):
-    conn = put_conn(conn)
+    conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("INSERT INTO lavagens (data,tipo_veiculo,servico,valor,cliente,placa,quantidade) VALUES (%s,%s,%s,%s,%s,%s,%s)", (data,tipo_veiculo,servico,valor,cliente,placa,quantidade))
     conn.commit()
     conn.close()
 
 def adicionar_mensalista(nome, telefone, tipo, placa, plano, valor_plano, data_inicio):
-    conn = put_conn(conn)
+    conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("INSERT INTO mensalistas (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo) VALUES (%s,%s,%s,%s,%s,%s,%s,1)", (nome,telefone,tipo,placa,plano,valor_plano,data_inicio))
     conn.commit()
@@ -423,7 +421,7 @@ def atualizar_mensalista(id, nome, telefone, tipo, placa, plano, valor_plano, da
     except (ValueError, TypeError):
         st.error("ID inválido")
         return
-    conn = put_conn(conn)
+    conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("UPDATE mensalistas SET nome=%s,telefone=%s,tipo=%s,placa=%s,plano=%s,valor_plano=%s,data_inicio=%s,ativo=%s WHERE id=%s", (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo,id_int))
     conn.commit()
@@ -435,7 +433,7 @@ def toggle_mensalista(id):
     except (ValueError, TypeError):
         st.error("ID inválido")
         return
-    conn = put_conn(conn)
+    conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("SELECT ativo FROM mensalistas WHERE id=%s", (id_int,))
         r = cur.fetchone()
@@ -450,7 +448,7 @@ def excluir_mensalista(id):
     except (ValueError, TypeError):
         st.error("ID inválido")
         return
-    conn = put_conn(conn)
+    conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("DELETE FROM mensalistas WHERE id=%s", (id_int,))
     conn.commit()
@@ -459,7 +457,7 @@ def excluir_mensalista(id):
 # SISTEMA DE DESPESAS
 #
 def adicionar_despesa(categoria, descricao, valor, mes, ano):
-    conn = put_conn(conn)
+    conn = get_conn()
     with conn.cursor() as cur:
         cur.execute(
             "INSERT INTO despesas (categoria, descricao, valor, mes, ano) VALUES (%s, %s, %s, %s, %s)",
@@ -469,7 +467,7 @@ def adicionar_despesa(categoria, descricao, valor, mes, ano):
     conn.close()
 
 def carregar_despesas(mes=None, ano=None):
-    conn = put_conn(conn)
+    conn = get_conn()
     with conn.cursor() as cur:
         if mes and ano:
             cur.execute("SELECT * FROM despesas WHERE mes = %s AND ano = %s ORDER BY data_cadastro DESC", (mes, ano))
@@ -487,14 +485,14 @@ def excluir_despesa(id):
     except (ValueError, TypeError):
         st.error("ID inválido")
         return
-    conn = put_conn(conn)
+    conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("DELETE FROM despesas WHERE id = %s", (id_int,))
     conn.commit()
     conn.close()
 
 def total_despesas(mes, ano):
-    conn = put_conn(conn)
+    conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("SELECT COALESCE(SUM(valor), 0) AS total FROM despesas WHERE mes = %s AND ano = %s", (mes, ano))
         r = cur.fetchone()
@@ -502,7 +500,7 @@ def total_despesas(mes, ano):
     return float(r['total'])
 
 def total_por_categoria(mes, ano):
-    conn = put_conn(conn)
+    conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("SELECT categoria, SUM(valor) AS total FROM despesas WHERE mes = %s AND ano = %s GROUP BY categoria ORDER BY total DESC", (mes, ano))
         rows = cur.fetchall()
@@ -1032,7 +1030,7 @@ with tab_analises:
 
                 # Meses com despesas
                 try:
-                    conn = put_conn(conn)
+                    conn = get_conn()
                     with conn.cursor() as cur:
                         cur.execute("SELECT DISTINCT ano, mes FROM despesas ORDER BY ano, mes")
                         for r in cur.fetchall():
@@ -1173,13 +1171,13 @@ if is_admin:
                 senha_master = st.text_input("Digite SUA SENHA para autorizar", type="password", placeholder="Sua senha")
             if st.button("☢️ SIM, QUERO RESETAR TUDO", type="primary", use_container_width=True,
                          disabled=(confirmacao != "RESETAR" or not senha_master)):
-                conn = put_conn(conn)
+                conn = get_conn()
                 with conn.cursor() as cur:
                     cur.execute("SELECT senha_hash FROM usuarios WHERE id = %s AND role = 'admin'", (usuario_id,))
                     admin = cur.fetchone()
                 conn.close()
                 if admin and admin['senha_hash'] == fazer_hash(senha_master):
-                    conn = put_conn(conn)
+                    conn = get_conn()
                     try:
                         with conn.cursor() as cur:
                             cur.execute("DELETE FROM lavagens")
