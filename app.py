@@ -794,9 +794,10 @@ with aba_despesas:
         # Gráfico por categoria
         df_cat = df_desp.groupby('categoria').agg({'valor': 'sum'}).reset_index().sort_values('valor', ascending=False)
         if not df_cat.empty:
+            df_cat['valor'] = pd.to_numeric(df_cat['valor'], errors='coerce')
             import altair as alt
             chart = alt.Chart(df_cat).mark_bar(size=35).encode(
-                x=alt.X('valor:Q', title='R$'),
+                x=alt.X('valor:Q', title='R$', scale=alt.Scale(domain=[0, df_cat['valor'].max() * 1.2])),
                 y=alt.Y('categoria:N', title='', sort='-x'),
                 color=alt.Color('categoria:N', legend=None),
                 tooltip=['categoria', 'valor']
