@@ -97,7 +97,7 @@ except Exception as e:
     st.error(f"Erro ao criar pool: {e}")
     connection_pool = None
 
-def put_conn(conn):
+def get_conn():
     if connection_pool:
         conn = connection_pool.getconn()
         conn.autocommit = True
@@ -115,7 +115,7 @@ def put_conn(conn):
 def init_db():
     if 'db_inicializado' in st.session_state and st.session_state.db_inicializado:
         return
-    conn = put_conn(conn)
+    conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("""
             CREATE TABLE IF NOT EXISTS lavagens (
@@ -124,7 +124,6 @@ def init_db():
                 placa TEXT, quantidade INTEGER
             )
         """)
-
         cur.execute("""
             CREATE TABLE IF NOT EXISTS mensalistas (
                 id SERIAL PRIMARY KEY, nome TEXT, telefone TEXT,
@@ -132,15 +131,23 @@ def init_db():
                 valor_plano NUMERIC, data_inicio DATE, ativo INTEGER DEFAULT 0
             )
         """)
-
-        # FIX 1: Corrige schema de tabelas existentes
         try:
             cur.execute("ALTER TABLE mensalistas ADD COLUMN IF NOT EXISTS valor_plano NUMERIC DEFAULT 0")
             cur.execute("ALTER TABLE mensalistas ADD COLUMN IF NOT EXISTS telefone TEXT DEFAULT ''")
             cur.execute("ALTER TABLE mensalistas ADD COLUMN IF NOT EXISTS plano TEXT DEFAULT 'Valor Fixo Mensal'")
-        except Exception:
+            cur.execute("ALTER TABLE mensalistas ADD COLUMN IF NOT EXISTS data_inicio DATE")
+        except:
             pass
-
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS despesas (
+                id SERIAL PRIMARY KEY, data DATE, categoria TEXT,
+                valor NUMERIC, descricao TEXT, mes INTEGER, ano INTEGER
+            )
+        """)
+        try:
+            cur.execute("ALTER TABLE despesas ADD COLUMN IF NOT EXISTS descricao TEXT DEFAULT ''")
+        except:
+            pass
         cur.execute("""
             CREATE TABLE IF NOT EXISTS precos (
                 id SERIAL PRIMARY KEY, tipo_veiculo TEXT,
@@ -148,39 +155,13 @@ def init_db():
             )
         """)
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS _migracao_feita (
-                id SERIAL PRIMARY KEY, concluida BOOLEAN DEFAULT TRUE
-            )
-        """)
-        cur.execute("""
             CREATE TABLE IF NOT EXISTS usuarios (
-                id SERIAL PRIMARY KEY,
-                nome TEXT NOT NULL,
-                email TEXT UNIQUE NOT NULL,
-                telefone TEXT DEFAULT '',
-                senha_hash TEXT NOT NULL,
-                role TEXT NOT NULL DEFAULT 'cliente',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                id SERIAL PRIMARY KEY, nome TEXT, email TEXT UNIQUE,
+                senha_hash TEXT, role TEXT DEFAULT 'operador'
             )
         """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS despesas (
-                id SERIAL PRIMARY KEY,
-                categoria TEXT NOT NULL,
-                descricao TEXT DEFAULT '',
-                valor NUMERIC NOT NULL,
-                mes INTEGER NOT NULL,
-                ano INTEGER NOT NULL,
-                data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            )
-        """)
-        # Corrige schema de tabelas existentes
-        try:
-            cur.execute("ALTER TABLE despesas ADD COLUMN IF NOT EXISTS descricao TEXT DEFAULT ''")
-        except Exception:
-            pass
-    conn.commit()
-    conn.close()
+    put_conn(conn)
+    st.session_state.db_inicializado = True
 
 def migracao_ja_feita():
     conn = put_conn(conn)
