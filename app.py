@@ -89,13 +89,33 @@ st.set_page_config(
 #
 # BANCO DE DADOS
 #
-def get_conn():
+from psycopg2 import pool
+
+try:
+    connection_pool = psycopg2.pool.SimpleConnectionPool(1, 10, DATABASE_URL)
+except Exception as e:
+    st.error(f"Erro ao criar pool: {e}")
+    connection_pool = None
+
+def put_conn(conn):
+    if connection_pool:
+        conn = connection_pool.getconn()
+        conn.autocommit = True
+        return conn
     conn = psycopg2.connect(DATABASE_URL, cursor_factory=RealDictCursor)
     conn.autocommit = True
     return conn
 
+def put_conn(conn):
+    if connection_pool:
+        connection_pool.putconn(conn)
+    else:
+        conn.close()
+
 def init_db():
-    conn = get_conn()
+    if 'db_inicializado' in st.session_state and st.session_state.db_inicializado:
+        return
+    conn = put_conn(conn)
     with conn.cursor() as cur:
         cur.execute("""
             CREATE TABLE IF NOT EXISTS lavagens (
@@ -104,6 +124,7 @@ def init_db():
                 placa TEXT, quantidade INTEGER
             )
         """)
+
         cur.execute("""
             CREATE TABLE IF NOT EXISTS mensalistas (
                 id SERIAL PRIMARY KEY, nome TEXT, telefone TEXT,
@@ -162,7 +183,7 @@ def init_db():
     conn.close()
 
 def migracao_ja_feita():
-    conn = get_conn()
+    conn = put_conn(conn)
     with conn.cursor() as cur:
         cur.execute("SELECT COUNT(*) AS total FROM _migracao_feita")
         r = cur.fetchone()
@@ -179,7 +200,7 @@ def is_header_row(r, col_names):
 def migrar_excel():
     if migracao_ja_feita():
         return
-    conn = get_conn()
+    conn = put_conn(conn)
     cursor = conn.cursor()
     xlsx = Path(__file__).parent / "dados.xlsx"
     if xlsx.exists():
@@ -265,7 +286,7 @@ def migrar_excel():
     conn.close()
 
 def limpar_dados_corrompidos():
-    conn = get_conn()
+    conn = put_conn(conn)
     with conn.cursor() as cur:
         cur.execute("DELETE FROM lavagens WHERE cliente IS NULL OR cliente = '' OR cliente = 'cliente'")
         cur.execute("DELETE FROM lavagens WHERE data IS NULL")
@@ -283,7 +304,7 @@ def fazer_hash(senha):
     return sha256(senha.encode('utf-8')).hexdigest()
 
 def criar_admin_master():
-    conn = get_conn()
+    conn = put_conn(conn)
     with conn.cursor() as cur:
         cur.execute("SELECT COUNT(*) AS total FROM usuarios WHERE role = 'admin'")
         if list(cur.fetchone().values())[0] == 0:
@@ -296,7 +317,7 @@ def criar_admin_master():
     conn.close()
 
 def autenticar_usuario(nome, senha):
-    conn = get_conn()
+    conn = put_conn(conn)
     with conn.cursor() as cur:
         cur.execute("SELECT id, nome, email, role, senha_hash FROM usuarios WHERE nome = %s", (nome,))
         user = cur.fetchone()
@@ -306,7 +327,7 @@ def autenticar_usuario(nome, senha):
     return None
 
 def cadastrar_usuario(nome, email, telefone, senha, role="cliente"):
-    conn = get_conn()
+    conn = put_conn(conn)
     try:
         with conn.cursor() as cur:
             hash_s = fazer_hash(senha)
@@ -322,7 +343,7 @@ def cadastrar_usuario(nome, email, telefone, senha, role="cliente"):
         conn.close()
 
 def editar_usuario(user_id, novo_nome=None, novo_email=None, novo_telefone=None, novo_role=None, nova_senha=None):
-    conn = get_conn()
+    conn = put_conn(conn)
     try:
         with conn.cursor() as cur:
             if nova_senha:
@@ -344,7 +365,7 @@ def editar_usuario(user_id, novo_nome=None, novo_email=None, novo_telefone=None,
         conn.close()
 
 def excluir_usuario(user_id):
-    conn = get_conn()
+    conn = put_conn(conn)
     try:
         with conn.cursor() as cur:
             cur.execute("DELETE FROM usuarios WHERE id = %s AND role != 'admin'", (user_id,))
@@ -356,7 +377,7 @@ def excluir_usuario(user_id):
         conn.close()
 
 def carregar_usuarios():
-    conn = get_conn()
+    conn = put_conn(conn)
     with conn.cursor() as cur:
         cur.execute("SELECT id, nome, email, telefone, role, created_at FROM usuarios ORDER BY id")
         rows = cur.fetchall()
@@ -366,7 +387,7 @@ def carregar_usuarios():
     return pd.DataFrame(rows)
 
 def get_preco(tipo_veiculo, servico):
-    conn = get_conn()
+    conn = put_conn(conn)
     with conn.cursor() as cur:
         cur.execute("SELECT valor FROM precos WHERE tipo_veiculo=%s AND servico=%s", (tipo_veiculo, servico))
         r = cur.fetchone()
@@ -380,9 +401,9 @@ def get_preco(tipo_veiculo, servico):
         ('Moto', 'Lavagem Simples'): 15, ('Moto', 'Lavagem Completa'): 25,
     }
     return precos_fallback.get((tipo_veiculo, servico), 0)
-
+@st.cache_data(ttl=60)
 def carregar_lavagens():
-    conn = get_conn()
+    conn = put_conn(conn)
     with conn.cursor() as cur:
         cur.execute("SELECT *, TO_CHAR(data, 'DD/MM/YYYY HH24:MI') AS data_formatada FROM lavagens ORDER BY data DESC")
         rows = cur.fetchall()
@@ -390,9 +411,9 @@ def carregar_lavagens():
     if not rows:
         return pd.DataFrame()
     return pd.DataFrame(rows)
-
+@st.cache_data(ttl=60)
 def carregar_mensalistas():
-    conn = get_conn()
+    conn = put_conn(conn)
     with conn.cursor() as cur:
         cur.execute("SELECT * FROM mensalistas ORDER BY nome")
         rows = cur.fetchall()
@@ -402,14 +423,14 @@ def carregar_mensalistas():
     return pd.DataFrame(rows)
 
 def registrar_lavagem(data, tipo_veiculo, servico, valor, cliente, placa, quantidade):
-    conn = get_conn()
+    conn = put_conn(conn)
     with conn.cursor() as cur:
         cur.execute("INSERT INTO lavagens (data,tipo_veiculo,servico,valor,cliente,placa,quantidade) VALUES (%s,%s,%s,%s,%s,%s,%s)", (data,tipo_veiculo,servico,valor,cliente,placa,quantidade))
     conn.commit()
     conn.close()
 
 def adicionar_mensalista(nome, telefone, tipo, placa, plano, valor_plano, data_inicio):
-    conn = get_conn()
+    conn = put_conn(conn)
     with conn.cursor() as cur:
         cur.execute("INSERT INTO mensalistas (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo) VALUES (%s,%s,%s,%s,%s,%s,%s,1)", (nome,telefone,tipo,placa,plano,valor_plano,data_inicio))
     conn.commit()
@@ -421,7 +442,7 @@ def atualizar_mensalista(id, nome, telefone, tipo, placa, plano, valor_plano, da
     except (ValueError, TypeError):
         st.error("ID inválido")
         return
-    conn = get_conn()
+    conn = put_conn(conn)
     with conn.cursor() as cur:
         cur.execute("UPDATE mensalistas SET nome=%s,telefone=%s,tipo=%s,placa=%s,plano=%s,valor_plano=%s,data_inicio=%s,ativo=%s WHERE id=%s", (nome,telefone,tipo,placa,plano,valor_plano,data_inicio,ativo,id_int))
     conn.commit()
@@ -433,7 +454,7 @@ def toggle_mensalista(id):
     except (ValueError, TypeError):
         st.error("ID inválido")
         return
-    conn = get_conn()
+    conn = put_conn(conn)
     with conn.cursor() as cur:
         cur.execute("SELECT ativo FROM mensalistas WHERE id=%s", (id_int,))
         r = cur.fetchone()
@@ -448,7 +469,7 @@ def excluir_mensalista(id):
     except (ValueError, TypeError):
         st.error("ID inválido")
         return
-    conn = get_conn()
+    conn = put_conn(conn)
     with conn.cursor() as cur:
         cur.execute("DELETE FROM mensalistas WHERE id=%s", (id_int,))
     conn.commit()
@@ -457,7 +478,7 @@ def excluir_mensalista(id):
 # SISTEMA DE DESPESAS
 #
 def adicionar_despesa(categoria, descricao, valor, mes, ano):
-    conn = get_conn()
+    conn = put_conn(conn)
     with conn.cursor() as cur:
         cur.execute(
             "INSERT INTO despesas (categoria, descricao, valor, mes, ano) VALUES (%s, %s, %s, %s, %s)",
@@ -467,7 +488,7 @@ def adicionar_despesa(categoria, descricao, valor, mes, ano):
     conn.close()
 
 def carregar_despesas(mes=None, ano=None):
-    conn = get_conn()
+    conn = put_conn(conn)
     with conn.cursor() as cur:
         if mes and ano:
             cur.execute("SELECT * FROM despesas WHERE mes = %s AND ano = %s ORDER BY data_cadastro DESC", (mes, ano))
@@ -485,14 +506,14 @@ def excluir_despesa(id):
     except (ValueError, TypeError):
         st.error("ID inválido")
         return
-    conn = get_conn()
+    conn = put_conn(conn)
     with conn.cursor() as cur:
         cur.execute("DELETE FROM despesas WHERE id = %s", (id_int,))
     conn.commit()
     conn.close()
 
 def total_despesas(mes, ano):
-    conn = get_conn()
+    conn = put_conn(conn)
     with conn.cursor() as cur:
         cur.execute("SELECT COALESCE(SUM(valor), 0) AS total FROM despesas WHERE mes = %s AND ano = %s", (mes, ano))
         r = cur.fetchone()
@@ -500,7 +521,7 @@ def total_despesas(mes, ano):
     return float(r['total'])
 
 def total_por_categoria(mes, ano):
-    conn = get_conn()
+    conn = put_conn(conn)
     with conn.cursor() as cur:
         cur.execute("SELECT categoria, SUM(valor) AS total FROM despesas WHERE mes = %s AND ano = %s GROUP BY categoria ORDER BY total DESC", (mes, ano))
         rows = cur.fetchall()
@@ -1030,7 +1051,7 @@ with tab_analises:
 
                 # Meses com despesas
                 try:
-                    conn = get_conn()
+                    conn = put_conn(conn)
                     with conn.cursor() as cur:
                         cur.execute("SELECT DISTINCT ano, mes FROM despesas ORDER BY ano, mes")
                         for r in cur.fetchall():
@@ -1171,13 +1192,13 @@ if is_admin:
                 senha_master = st.text_input("Digite SUA SENHA para autorizar", type="password", placeholder="Sua senha")
             if st.button("☢️ SIM, QUERO RESETAR TUDO", type="primary", use_container_width=True,
                          disabled=(confirmacao != "RESETAR" or not senha_master)):
-                conn = get_conn()
+                conn = put_conn(conn)
                 with conn.cursor() as cur:
                     cur.execute("SELECT senha_hash FROM usuarios WHERE id = %s AND role = 'admin'", (usuario_id,))
                     admin = cur.fetchone()
                 conn.close()
                 if admin and admin['senha_hash'] == fazer_hash(senha_master):
-                    conn = get_conn()
+                    conn = put_conn(conn)
                     try:
                         with conn.cursor() as cur:
                             cur.execute("DELETE FROM lavagens")
