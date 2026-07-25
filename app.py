@@ -981,9 +981,7 @@ with tab3:
                     qtd_tipo = int(top_tipo.iloc[0])
                     st.markdown(f"""<div style="background:#eff6ff;border-radius:12px;padding:1rem;border-left:4px solid #3b82f6;"><div style="font-size:0.75rem;color:#6b7280;font-weight:600;">🚗 VEÍCULO TOP</div><div style="font-size:1.3rem;font-weight:800;color:#111827;">{nome_tipo}</div><div style="font-size:0.9rem;color:#6b7280;">{qtd_tipo} lavagens</div></div>""", unsafe_allow_html=True)
             with col_i3:
-                cor_ticket = "#10b981" if ticket_medio >= meta_ticket else ("#f59e0b" if ticket_medio >= meta_ticket * 0.7 else "#ef4444")
-                sinal_ticket = "🟢" if ticket_medio >= meta_ticket else ("🟡" if ticket_medio >= meta_ticket * 0.7 else "🔴")
-                st.markdown(f"""<div style="background:#fefce8;border-radius:12px;padding:1rem;border-left:4px solid {cor_ticket};"><div style="font-size:0.75rem;color:#6b7280;font-weight:600;">{sinal_ticket} TICKET MÉDIO</div><div style="font-size:1.3rem;font-weight:800;color:#111827;">R$ {ticket_medio:.2f}</div><div style="font-size:0.9rem;color:#6b7280;">Meta: R$ {meta_ticket:.2f}</div></div>""", unsafe_allow_html=True)
+                st.markdown(f"""<div style="background:#fefce8;border-radius:12px;padding:1rem;border-left:4px solid #f59e0b;"><div style="font-size:0.75rem;color:#6b7280;font-weight:600;">🎯 TICKET MÉDIO</div><div style="font-size:1.3rem;font-weight:800;color:#111827;">R$ {ticket_medio:.2f}</div></div>""", unsafe_allow_html=True)
             st.markdown("---")
             col_c1, col_c2 = st.columns(2)
             with col_c1:
@@ -993,17 +991,7 @@ with tab3:
                 if not df_dia_sem.empty:
                     df_dia_sem['dia'] = df_dia_sem['dia_semana'].map(dias_nomes)
                     st.bar_chart(df_dia_sem.set_index('dia')['quantidade'], use_container_width=True)
-            with col_c2:
-                st.markdown("##### 💰 Performance vs Meta")
-                metas_df = pd.DataFrame({
-                'Indicador': ['Lavagens', 'Receita', 'Mensalistas', 'Ticket'],
-                'Atual': [qtd_total_lav, receita_lav, mens_ativos, ticket_medio],
-                'Meta': [meta_lav, meta_rec, meta_mens, meta_ticket],
-            })
-                for _, r in metas_df.iterrows():
-                    pct = (r['Atual'] / r['Meta'] * 100) if r['Meta'] > 0 else 0
-                    cor = "#10b981" if pct >= 100 else ("#f59e0b" if pct >= 70 else "#ef4444")
-                    st.markdown(f"""<div style="display:flex;justify-content:space-between;padding:0.3rem 0;"><span style="font-weight:600;">{r['Indicador']}</span><span style="color:{cor};font-weight:700;">{r['Atual']:.1f} / {r['Meta']:.0f} ({pct:.0f}%)</span></div>""", unsafe_allow_html=True)
+               
         else:
             st.info("Nenhum dado disponível para gerar insights no período selecionado.")
 
