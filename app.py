@@ -841,6 +841,7 @@ with tab3:
     total_lav = 0
     receita_lav = 0
     ticket_medio = 0
+    receita_bruta = 0
     if not df_lav.empty:
         df_lav['data_raw'] = pd.to_datetime(df_lav['data_formatada'] if 'data_formatada' in df_lav.columns else df_lav['data'], errors='coerce')
         df_lav = df_lav.dropna(subset=['data_raw']).reset_index(drop=True)
