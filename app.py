@@ -842,6 +842,14 @@ with tab3:
     receita_lav = 0
     ticket_medio = 0
     receita_bruta = 0
+
+    # Soma receita dos mensalistas ativos (SEMPRE, independente de lavagens)
+    receita_mensalistas = 0
+    if not df_mens.empty:
+        mens_ativos_mask = df_mens['ativo'] == 1
+        if mens_ativos_mask.any():
+            receita_mensalistas = pd.to_numeric(df_mens.loc[mens_ativos_mask, 'valor_plano'], errors='coerce').sum()
+
     if not df_lav.empty:
         df_lav['data_raw'] = pd.to_datetime(df_lav['data_formatada'] if 'data_formatada' in df_lav.columns else df_lav['data'], errors='coerce')
         df_lav = df_lav.dropna(subset=['data_raw']).reset_index(drop=True)
@@ -876,25 +884,17 @@ with tab3:
             receita_lav = float(df_filtro['valor'].sum()) if not df_filtro.empty else 0
             ticket_medio = receita_lav / qtd_total_lav if qtd_total_lav > 0 else 0
 
-            # Soma receita dos mensalistas ativos
-            if not df_mens.empty:
-                mens_ativos_mask = df_mens['ativo'] == 1
-                if mens_ativos_mask.any():
-                    receita_mensalistas = pd.to_numeric(df_mens.loc[mens_ativos_mask, 'valor_plano'], errors='coerce').sum()
-                else:
-                    receita_mensalistas = 0
-            else:
-                receita_mensalistas = 0
-
             receita_bruta = receita_lav + receita_mensalistas
         else:
             st.info("Nenhuma lavagem com data válida.")
+            receita_bruta = receita_lav + receita_mensalistas
     else:
         st.info("Nenhuma lavagem registrada ainda.")
+        receita_bruta = receita_lav + receita_mensalistas
 
     # Despesas do período selecionado
     if mes_sel is not None and ano_sel is not None:
-        total_desp = total_despesas(int(mes_sel), ano_sel)
+        total_desp = total_despesas(int(mes_sel), int(ano_sel))
     else:
         total_desp = 0
     receita_liquida = receita_bruta - total_desp
