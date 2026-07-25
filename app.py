@@ -1003,12 +1003,15 @@ with tab_analises:
                     meses_lista.update(df_tmp['data_raw'].dt.strftime('%Y-%m').unique())
 
                 # Meses com despesas
-                conn = get_conn()
-                with conn.cursor() as cur:
-                    cur.execute("SELECT DISTINCT ano, mes FROM despesas ORDER BY ano, mes")
-                    for r in cur.fetchall():
-                        meses_lista.add(f"{r['ano']}-{int(r['mes']):02d}")
-                conn.close()
+                try:
+                    conn = get_conn()
+                    with conn.cursor() as cur:
+                        cur.execute("SELECT DISTINCT ano, mes FROM despesas ORDER BY ano, mes")
+                        for r in cur.fetchall():
+                            meses_lista.add(f"{r['ano']}-{int(r['mes']):02d}")
+                    conn.close()
+                except:
+                    pass
 
                 # Mês atual (julho 2026)
                 meses_lista.add("2026-07")
@@ -1034,7 +1037,10 @@ with tab_analises:
                             rec_lav = float(df_lav.loc[mask_lav, 'valor'].sum()) if mask_lav.any() else 0
 
                         # Despesas do mês
-                        desp = total_despesas(int(m), int(a))
+                        try:
+                            desp = total_despesas(int(m), int(a))
+                        except:
+                            desp = 0
 
                         liquida = rec_lav + rec_mens - desp
                         dados_grafico.append({'mes_ano': mes_ano, 'liquida': liquida})
@@ -1042,24 +1048,16 @@ with tab_analises:
                     df_mensal = pd.DataFrame(dados_grafico)
 
                     if not df_mensal.empty:
-                        import altair as alt
-                        chart = alt.Chart(df_mensal).mark_bar(color='#10b981', size=25).encode(
-                            x=alt.X('mes_ano:N', title='', sort=None, axis=alt.Axis(labelAngle=-45)),
-                            y=alt.Y('liquida:Q', title='R$'),
-                            tooltip=[
-                                alt.Tooltip('mes_ano:N', title='Mês'),
-                                alt.Tooltip('liquida:Q', title='Receita Líquida', format='R$,.2f')
-                            ]
-                        ).properties(height=250)
-                        st.altair_chart(chart, use_container_width=True)
+                        # Usa st.bar_chart nativo ao invés do Altair (mais confiável)
+                        st.bar_chart(df_mensal.set_index('mes_ano')['liquida'], use_container_width=True)
                     else:
                         st.info("Sem dados para exibir.")
                 else:
                     st.info("Sem dados para exibir.")
 
                
-        else:
-            st.info("Nenhum dado disponível para gerar insights no período selecionado.")
+        #else:
+            #st.info("Nenhum dado disponível para gerar insights no período selecionado.")
 
 # -------- ABA 4: ADMIN (só para MASTER) --------
 if is_admin:
