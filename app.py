@@ -285,7 +285,7 @@ def fazer_hash(senha):
     return sha256(senha.encode('utf-8')).hexdigest()
 
 def criar_admin_master():
-    conn = put_conn(conn)
+    conn = get_conn(conn)
     with conn.cursor() as cur:
         cur.execute("SELECT COUNT(*) AS total FROM usuarios WHERE role = 'admin'")
         if list(cur.fetchone().values())[0] == 0:
