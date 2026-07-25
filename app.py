@@ -891,7 +891,7 @@ with tab3:
     else:
         st.info("Nenhuma lavagem registrada ainda.")
 
-        # Despesas do período selecionado
+    # Despesas do período selecionado
     if mes_sel is not None and ano_sel is not None:
         total_desp = total_despesas(int(mes_sel), ano_sel)
     else:
@@ -899,7 +899,9 @@ with tab3:
     receita_liquida = receita_bruta - total_desp
 
     mens_ativos = len(df_mens[df_mens['ativo'] == 1]) if not df_mens.empty else 0
-    meta_lav = 20; meta_rec = 3000; meta_mens = 3; meta_ticket = 120; meta_lucro = 2000
+
+            
+    
     def sf(v, m):
         if v >= m: return "verde"
         elif v >= m * 0.7: return "amarelo"
