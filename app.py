@@ -994,13 +994,39 @@ with tab_analises:
             with col_c2:
                 st.markdown("##### 📊 Receita Líquida Mensal")
 
-                # Gera lista de meses com base nos dados disponíveis
+                # Descobre o mês inicial com base nos dados reais
+                mes_inicial = None
+
+                # Data da lavagem mais antiga
+                if not df_lav.empty and 'data_raw' in df_lav.columns:
+                    df_tmp = df_lav[df_lav['data_raw'].notna()]
+                    if not df_tmp.empty:
+                        mes_inicial = df_tmp['data_raw'].min()
+
+                # Data do mensalista mais antigo (data_inicio)
+                if not df_mens.empty:
+                    datas_inicio = pd.to_datetime(df_mens['data_inicio'], errors='coerce').dropna()
+                    if not datas_inicio.empty:
+                        data_mens = datas_inicio.min()
+                        if mes_inicial is None or data_mens < mes_inicial:
+                            mes_inicial = data_mens
+
+                if mes_inicial is not None:
+                    mes_inicial_str = mes_inicial.strftime('%Y-%m')
+                else:
+                    mes_inicial_str = "2026-07"  # fallback pro mês atual
+
+                # Gera lista de meses a partir do mês inicial
                 meses_lista = set()
+                hoje = datetime.now()
+                mes_atual = hoje.strftime('%Y-%m')
 
                 # Meses com lavagens
                 if not df_lav.empty and 'data_raw' in df_lav.columns:
                     df_tmp = df_lav[df_lav['data_raw'].notna()].copy()
-                    meses_lista.update(df_tmp['data_raw'].dt.strftime('%Y-%m').unique())
+                    for m in df_tmp['data_raw'].dt.strftime('%Y-%m').unique():
+                        if m >= mes_inicial_str:
+                            meses_lista.add(m)
 
                 # Meses com despesas
                 try:
@@ -1008,13 +1034,16 @@ with tab_analises:
                     with conn.cursor() as cur:
                         cur.execute("SELECT DISTINCT ano, mes FROM despesas ORDER BY ano, mes")
                         for r in cur.fetchall():
-                            meses_lista.add(f"{r['ano']}-{int(r['mes']):02d}")
+                            m = f"{r['ano']}-{int(r['mes']):02d}"
+                            if m >= mes_inicial_str:
+                                meses_lista.add(m)
                     conn.close()
                 except:
                     pass
 
-                # Mês atual (julho 2026)
-                meses_lista.add("2026-07")
+                # Mês atual (só se for >= mês inicial)
+                if mes_atual >= mes_inicial_str:
+                    meses_lista.add(mes_atual)
 
                 if meses_lista:
                     meses_ordenados = sorted(meses_lista)
@@ -1029,16 +1058,17 @@ with tab_analises:
 
                     for mes_ano in meses_ordenados:
                         a, m = mes_ano.split('-')
+                        a, m = int(a), int(m)
 
                         # Receita de lavagens do mês
                         rec_lav = 0
                         if not df_lav.empty and 'data_raw' in df_lav.columns:
-                            mask_lav = (df_lav['data_raw'].dt.year == int(a)) & (df_lav['data_raw'].dt.month == int(m))
+                            mask_lav = (df_lav['data_raw'].dt.year == a) & (df_lav['data_raw'].dt.month == m)
                             rec_lav = float(df_lav.loc[mask_lav, 'valor'].sum()) if mask_lav.any() else 0
 
                         # Despesas do mês
                         try:
-                            desp = total_despesas(int(m), int(a))
+                            desp = total_despesas(m, a)
                         except:
                             desp = 0
 
@@ -1048,7 +1078,6 @@ with tab_analises:
                     df_mensal = pd.DataFrame(dados_grafico)
 
                     if not df_mensal.empty:
-                        # Usa st.bar_chart nativo ao invés do Altair (mais confiável)
                         st.bar_chart(df_mensal.set_index('mes_ano')['liquida'], use_container_width=True)
                     else:
                         st.info("Sem dados para exibir.")
