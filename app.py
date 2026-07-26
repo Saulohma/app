@@ -652,18 +652,17 @@ with tab_registrar:
         quantidade = st.number_input("Quantidade", min_value=1, value=1, step=1, key="qtd")
         valor_total = valor_base * quantidade
         st.markdown("---")
-        st.markdown("##### 💰 Desconto")
+        st.markdown("##### 💰 Desconto (R$)")
         col_desc1, col_desc2 = st.columns([1, 1])
         with col_desc1:
-            desconto_perc = st.number_input("Desconto (%)", min_value=0.0, max_value=100.0, value=0.0, step=1.0, key="desc_perc")
+            desconto_valor = st.number_input("Valor do Desconto (R$)", min_value=0.0, max_value=float(valor_total), value=0.0, step=5.0, key="desc_valor")
         with col_desc2:
-            valor_desc = round(valor_total * (desconto_perc / 100), 2)
-            valor_final = valor_total - valor_desc
+            valor_final = valor_total - desconto_valor
             st.markdown(f"""
             <div style="background:#1e293b;padding:0.8rem;border-radius:10px;border:1px solid #334155;">
-                <p style="margin:0;color:#94a3b8;font-size:0.75rem;">Valor com Desconto</p>
-                <p style="margin:0;font-size:1.5rem;font-weight:800;color:{"#10b981" if valor_final < valor_total else "#3b82f6"};">R$ {valor_final:.2f}</p>
-                {f'<p style="margin:0;color:#ef4444;font-size:0.75rem;">Desconto: R$ {valor_desc:.2f} ({desconto_perc:.0f}%)</p>' if desconto_perc > 0 else ''}
+                <p style="margin:0;color:#94a3b8;font-size:0.75rem;">Valor Final</p>
+                <p style="margin:0;font-size:1.5rem;font-weight:800;color:{"#10b981" if desconto_valor > 0 else "#3b82f6"};">R$ {valor_final:.2f}</p>
+                {f'<p style="margin:0;color:#ef4444;font-size:0.75rem;">Desconto: R$ {desconto_valor:.2f}</p>' if desconto_valor > 0 else ''}
             </div>
             """, unsafe_allow_html=True)
         st.markdown(f"""<div style="background:#f3f4f6;border-radius:12px;padding:1rem;margin-bottom:1rem;"><p style="margin:0;color:#6b7280;font-size:0.85rem;">Valor Unitário</p><p style="margin:0;font-size:1.5rem;font-weight:800;color:#111827;">R$ {float(valor_base):.2f}</p><p style="margin:0;color:#6b7280;font-size:0.85rem;margin-top:0.5rem;">Valor Total ({quantidade}x)</p><p style="margin:0;font-size:1.8rem;font-weight:800;color:#1e3a5f;">R$ {float(valor_total):.2f}</p></div>""", unsafe_allow_html=True)
@@ -678,7 +677,7 @@ with tab_registrar:
                     data_lavagem.year, data_lavagem.month, data_lavagem.day,
                     agora.hour, agora.minute, agora.second
                 )
-                registrar_lavagem(data_completa, tipo_veiculo, servico, valor_total, desconto_perc, nome_cliente, placa.strip().upper(), quantidade)
+                registrar_lavagem(data_completa, tipo_veiculo, servico, valor_total, nome_cliente, placa.strip().upper(), quantidade, desconto_valor, valor_final)
                 st.success(f"✅ Lavagem registrada: {nome_cliente} - {servico} - R$ {float(valor_total):.2f}")
                 st.rerun()
     with col_history:
