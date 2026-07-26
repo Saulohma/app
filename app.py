@@ -111,13 +111,6 @@ def init_db():
         valor_com_desconto REAL DEFAULT 0
         )
     """)
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS mensalistas (
-                id SERIAL PRIMARY KEY, nome TEXT, telefone TEXT,
-                tipo TEXT, placa TEXT, plano TEXT,
-                valor_plano NUMERIC, data_inicio DATE, ativo INTEGER DEFAULT 0
-            )
-        """)
 
         # FIX 1: Corrige schema de tabelas existentes
         try:
