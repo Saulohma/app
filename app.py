@@ -391,7 +391,7 @@ def get_preco(tipo_veiculo, servico):
 def carregar_lavagens():
     conn = get_conn()
     with conn.cursor() as cur:
-        cur.execute("SELECT *, TO_CHAR(data, 'DD/MM/YYY) AS data_formatada FROM lavagens ORDER BY data DESC")
+        cur.execute("SELECT *, TO_CHAR(data, 'DD/MM/YYYY') AS data_formatada FROM lavagens ORDER BY data DESC")
         rows = cur.fetchall()
     conn.close()
     if not rows:
