@@ -644,12 +644,18 @@ with tab_registrar:
         st.markdown(f"""<div style="background:#f3f4f6;border-radius:12px;padding:1rem;margin-bottom:1rem;"><p style="margin:0;color:#6b7280;font-size:0.85rem;">Valor Unitário</p><p style="margin:0;font-size:1.5rem;font-weight:800;color:#111827;">R$ {float(valor_base):.2f}</p><p style="margin:0;color:#6b7280;font-size:0.85rem;margin-top:0.5rem;">Valor Total ({quantidade}x)</p><p style="margin:0;font-size:1.8rem;font-weight:800;color:#1e3a5f;">R$ {float(valor_total):.2f}</p></div>""", unsafe_allow_html=True)
         cliente = st.text_input("Nome do Cliente", key="cl", placeholder="Nome (ou deixe vazio)")
         placa = st.text_input("Placa", key="pl", placeholder="Placa").upper()
+        data_lavagem = st.date_input("Data da Lavagem", value=date.today(), key="dl")
         if st.button("💾 Registrar Lavagem", type="primary", use_container_width=True):
-            nome_cliente = cliente.strip().upper() if cliente.strip() else f"{tipo_veiculo} #1"
-            agora = datetime.now()
-            registrar_lavagem(agora, tipo_veiculo, servico, valor_total, nome_cliente, placa.strip().upper(), quantidade)
-            st.success(f"✅ Lavagem registrada: {nome_cliente} - {servico} - R$ {float(valor_total):.2f}")
-            st.rerun()
+                nome_cliente = cliente.strip().upper() if cliente.strip() else f"{tipo_veiculo} #1"
+                # Usa a data escolhida + horário atual
+                agora = datetime.now()
+                data_completa = datetime(
+                    data_lavagem.year, data_lavagem.month, data_lavagem.day,
+                    agora.hour, agora.minute, agora.second
+                )
+                registrar_lavagem(data_completa, tipo_veiculo, servico, valor_total, nome_cliente, placa.strip().upper(), quantidade)
+                st.success(f"✅ Lavagem registrada: {nome_cliente} - {servico} - R$ {float(valor_total):.2f}")
+                st.rerun()
     with col_history:
         st.markdown("#### 📋 Últimas Lavagens")
         df_lav = carregar_lavagens()
