@@ -698,58 +698,67 @@ with tab_registrar:
 # -------- ABA 2: MENSALISTAS --------
 with tab_mensalistas:
     col_cad, col_lista = st.columns([1, 2])
+
     with col_cad:
         st.markdown("#### ➕ Novo Mensalista")
         if 'refresh_key' not in st.session_state:
             st.session_state.refresh_key = 0
-    df_mens = carregar_mensalistas()
-    with st.form("form_mens"):
-        nome_m = st.text_input("Nome", key="nm").strip().upper()
-        tel_m = st.text_input("Telefone", key="tm", placeholder="(99) 99999-9999")
-        tipo_m = st.selectbox("Tipo", ["Comum","SUV","Caminhonete","Moto"], key="tpm")
-        placa_m = st.text_input("Placa", key="pm").upper()
-        plano_m = st.selectbox("Plano", ["Valor Fixo Mensal","Pacote de Lavagens"], key="plm")
-        valor_m = st.number_input("Valor do Plano (R$)", min_value=0.0, step=10.0, key="vm")
-        data_m = st.date_input("Data de Início", value=date.today(), key="dm")
-        if st.form_submit_button("📥 Cadastrar", type="primary", use_container_width=True):
-            if nome_m:
-                adicionar_mensalista(nome_m, tel_m, tipo_m, placa_m, plano_m, valor_m, data_m.strftime("%Y-%m-%d"))
-                st.success(f"✅ {nome_m} cadastrado como ATIVO")
-                st.rerun()
-            else:
-                st.warning("Nome é obrigatório")
+
+        with st.form("form_mens"):
+            nome_m = st.text_input("Nome", key="nm").strip().upper()
+            tel_m = st.text_input("Telefone", key="tm", placeholder="(99) 99999-9999")
+            tipo_m = st.selectbox("Tipo", ["Comum", "SUV", "Caminhonete", "Moto"], key="tpm")
+            placa_m = st.text_input("Placa", key="pm").upper()
+            plano_m = st.selectbox("Plano", ["Valor Fixo Mensal", "Pacote de Lavagens"], key="plm")
+            valor_m = st.number_input("Valor do Plano (R$)", min_value=0.0, step=10.0, key="vm")
+            data_m = st.date_input("Data de Início", value=date.today(), key="dm")
+
+            if st.form_submit_button("📥 Cadastrar", type="primary", use_container_width=True):
+                if nome_m:
+                    adicionar_mensalista(nome_m, tel_m, tipo_m, placa_m, plano_m, valor_m, data_m.strftime("%Y-%m-%d"))
+                    st.success(f"✅ {nome_m} cadastrado como ATIVO")
+                    st.rerun()
+                else:
+                    st.warning("Nome é obrigatório")
+
     with col_lista:
         df_mens = carregar_mensalistas()
         st.markdown("#### 📋 Mensalistas")
         if not df_mens.empty:
-            # FIX 2: verifica se valor_plano existe
             if 'valor_plano' in df_mens.columns:
                 df_mens['valor_plano'] = pd.to_numeric(df_mens['valor_plano'], errors='coerce').fillna(0)
             else:
                 df_mens['valor_plano'] = 0
 
-            total = len(df_mens); ativos = len(df_mens[df_mens['ativo']==1]); inativos = total - ativos
-            receita_mensal = pd.to_numeric(df_mens.loc[df_mens['ativo']==1, 'valor_plano'], errors='coerce').sum()
+            total = len(df_mens)
+            ativos = len(df_mens[df_mens['ativo'] == 1])
+            inativos = total - ativos
+            receita_mensal = pd.to_numeric(df_mens.loc[df_mens['ativo'] == 1, 'valor_plano'], errors='coerce').sum()
             mk1, mk2, mk3, mk4 = st.columns(4)
-            mk1.metric("Total", total); mk2.metric("Ativos", ativos); mk3.metric("Inativos", inativos)
-            mk4.metric("Receita Mensal", f"R${float(receita_mensal):,.0f}".replace(",","X").replace(".",",").replace("X","."))
+            mk1.metric("Total", total)
+            mk2.metric("Ativos", ativos)
+            mk3.metric("Inativos", inativos)
+            mk4.metric("Receita Mensal", f"R${float(receita_mensal):,.0f}".replace(",", "X").replace(".", ",").replace("X", "."))
+
     st.markdown("---")
-    df_mens = df_mens.reset_index(drop=True)
-    if df_mens.empty:
+
+    df_mens_lista = carregar_mensalistas()
+    if df_mens_lista.empty:
         st.info("Nenhum mensalista cadastrado.")
     else:
-        for idx, row in df_mens.iterrows():
+        for idx, row in df_mens_lista.iterrows():
             ativo_val = int(row['ativo']) if row['ativo'] is not None else 0
             ativo_bool = bool(ativo_val)
             sc = "ativo" if ativo_bool else "inativo"
             stxt = "🟢 Ativo" if ativo_bool else "🔴 Inativo"
             cor_borda = "#10b981" if ativo_bool else "#ef4444"
-            st.markdown(f"""<div class="card-mensalista {sc}" style="border: 2px solid {cor_borda} !important; opacity: {'1' if ativo_bool else '0.85'} !important;"><div style="display:flex;justify-content:space-between;align-items:start;"><div><div class="nome">{row['nome']}</div><div class="info">📞 {row['telefone']}</div><div class="info">{row['tipo']} | {row['placa']}</div><div class="info">{row['plano']} — R$ {float(row['valor_plano']):.2f}</div><div class="info">📅 Início: {row['data_inicio']}</div></div><div style="color:{cor_borda};font-weight:700;">{stxt}</div></div></div>""", unsafe_allow_html=True)
-            c1, c2, c3 = st.columns([1,1,1])
+
+            st.markdown(f"""<div class="card-mensalista {sc}" style="border:2px solid {cor_borda}!important;opacity:{'1' if ativo_bool else '0.85'}!important;"><div style="display:flex;justify-content:space-between;align-items:start;"><div><div class="nome">{row['nome']}</div><div class="info">📞 {row['telefone']}</div><div class="info">{row['tipo']} | {row['placa']}</div><div class="info">{row['plano']} — R$ {float(row['valor_plano']):.2f}</div><div class="info">📅 Início: {row['data_inicio']}</div></div><div style="color:{cor_borda};font-weight:700;">{stxt}</div></div></div>""", unsafe_allow_html=True)
+
+            c1, c2, c3 = st.columns([1, 1, 1])
             with c1:
                 if st.button("🔄 Ativar/Desativar", key=f"t_{idx}", use_container_width=True):
                     toggle_mensalista(row['id'])
-                    st.session_state.refresh_key = st.session_state.get('refresh_key', 0) + 1
                     st.rerun()
             with c2:
                 if st.button("📝 Editar", key=f"e_{idx}", use_container_width=True):
@@ -757,22 +766,50 @@ with tab_mensalistas:
             with c3:
                 if st.button("🗑️ Excluir", key=f"d_{idx}", use_container_width=True):
                     excluir_mensalista(row['id'])
-                    st.session_state.refresh_key = st.session_state.get('refresh_key', 0) + 1
                     st.rerun()
+
             if st.session_state.get(f'ed_{idx}', False):
+                # CORREÇÃO: trata data_inicio que pode vir como None, False, string ou date
+                raw_data = row['data_inicio']
+                if raw_data is None or raw_data is False or raw_data == '':
+                    data_edit = date.today()
+                elif isinstance(raw_data, str):
+                    try:
+                        data_edit = datetime.strptime(raw_data, "%Y-%m-%d").date()
+                    except:
+                        data_edit = date.today()
+                elif hasattr(raw_data, 'date'):
+                    data_edit = raw_data.date()
+                elif isinstance(raw_data, date):
+                    data_edit = raw_data
+                else:
+                    data_edit = date.today()
+
                 with st.form(f"ef_{idx}"):
                     en = st.text_input("Nome", value=row['nome'], key=f"en_{idx}")
                     et = st.text_input("Telefone", value=row['telefone'], key=f"et_{idx}")
-                    etp = st.selectbox("Tipo", ["Comum","SUV","Caminhonete","Moto"], index=["Comum","SUV","Caminhonete","Moto"].index(row['tipo']) if row['tipo'] in ["Comum","SUV","Caminhonete","Moto"] else 0, key=f"etp_{idx}")
+                    etp = st.selectbox("Tipo", ["Comum", "SUV", "Caminhonete", "Moto"],
+                        index=["Comum", "SUV", "Caminhonete", "Moto"].index(row['tipo']) if row['tipo'] in ["Comum", "SUV", "Caminhonete", "Moto"] else 0,
+                        key=f"etp_{idx}")
                     ep = st.text_input("Placa", value=row['placa'], key=f"ep_{idx}")
-                    epl = st.selectbox("Plano", ["Valor Fixo Mensal","Pacote de Lavagens"], index=0 if row['plano']=="Valor Fixo Mensal" else 1, key=f"epl_{idx}")
+                    epl = st.selectbox("Plano", ["Valor Fixo Mensal", "Pacote de Lavagens"],
+                        index=0 if row['plano'] == "Valor Fixo Mensal" else 1,
+                        key=f"epl_{idx}")
                     ev = st.number_input("Valor", value=float(row['valor_plano']), key=f"ev_{idx}")
-                    ed = st.date_input("Data", value=row['data_inicio'] if row['data_inicio'] else date.today(), key=f"ed_{idx}")
+                    ed = st.date_input("Data", value=data_edit, key=f"ed_{idx}")
                     ea = st.checkbox("Ativo", value=bool(row['ativo']), key=f"ea_{idx}")
-                    if st.form_submit_button("💾 Salvar", use_container_width=True):
-                        atualizar_mensalista(row['id'], en, et, etp, ep, epl, ev, ed.strftime("%Y-%m-%d"), 1 if ea else 0)
-                        st.session_state[f'ed_{idx}'] = False
-                        st.rerun()
+
+                    col_salva, col_cancela = st.columns([1, 1])
+                    with col_salva:
+                        if st.form_submit_button("💾 Salvar", type="primary", use_container_width=True):
+                            atualizar_mensalista(row['id'], en, et, etp, ep, epl, ev, ed.strftime("%Y-%m-%d"), 1 if ea else 0)
+                            st.session_state[f'ed_{idx}'] = False
+                            st.rerun()
+                    with col_cancela:
+                        if st.form_submit_button("Cancelar", use_container_width=True):
+                            st.session_state[f'ed_{idx}'] = False
+                            st.rerun()
+
             st.markdown("---")
 
 # -------- ABA 3 (ou 4): DESPESAS --------
