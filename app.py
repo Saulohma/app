@@ -635,6 +635,7 @@ if is_admin:
     tab_registrar, tab_mensalistas, tab_despesas, tab_analises, tab_admin = st.tabs(["📝 Registrar Lavagem", "👥 Mensalistas", "💰 Despesas", "📊 Análises Executivas", "⚙️ Admin"])
 else:
     tab_registrar, tab_mensalistas, tab_despesas, tab_analises = st.tabs(["📝 Registrar Lavagem", "👥 Mensalistas", "💰 Despesas", "📊 Análises Executivas"])
+
 # -------- ABA 1: REGISTRAR LAVAGEM --------
 with tab_registrar:
     col_form, col_history = st.columns([1, 1.5])

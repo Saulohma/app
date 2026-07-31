@@ -98,12 +98,19 @@ def init_db():
     conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS lavagens (
-                id SERIAL PRIMARY KEY, data TIMESTAMP, tipo_veiculo TEXT,
-                servico TEXT, valor NUMERIC, cliente TEXT,
-                placa TEXT, quantidade INTEGER
-            )
-        """)
+    CREATE TABLE IF NOT EXISTS lavagens (
+        id SERIAL PRIMARY KEY,
+        data TIMESTAMP,
+        tipo_veiculo TEXT,
+        servico TEXT,
+        valor REAL,
+        cliente TEXT,
+        placa TEXT,
+        quantidade INTEGER DEFAULT 1,
+        desconto REAL DEFAULT 0,
+        valor_com_desconto REAL DEFAULT 0
+        )
+    """)
         cur.execute("""
             CREATE TABLE IF NOT EXISTS mensalistas (
                 id SERIAL PRIMARY KEY, nome TEXT, telefone TEXT,
@@ -384,7 +391,7 @@ def get_preco(tipo_veiculo, servico):
 def carregar_lavagens():
     conn = get_conn()
     with conn.cursor() as cur:
-        cur.execute("SELECT *, TO_CHAR(data, 'DD/MM/YYYY HH24:MI') AS data_formatada FROM lavagens ORDER BY data DESC")
+        cur.execute("SELECT *, TO_CHAR(data, 'DD/MM/YYYY') AS data_formatada FROM lavagens ORDER BY data DESC")
         rows = cur.fetchall()
     conn.close()
     if not rows:
@@ -401,10 +408,13 @@ def carregar_mensalistas():
         return pd.DataFrame()
     return pd.DataFrame(rows)
 
-def registrar_lavagem(data, tipo_veiculo, servico, valor, cliente, placa, quantidade):
+def registrar_lavagem(data, tipo_veiculo, servico, valor, cliente, placa, quantidade=1, desconto=0, valor_com_desconto=0):
     conn = get_conn()
-    with conn.cursor() as cur:
-        cur.execute("INSERT INTO lavagens (data,tipo_veiculo,servico,valor,cliente,placa,quantidade) VALUES (%s,%s,%s,%s,%s,%s,%s)", (data,tipo_veiculo,servico,valor,cliente,placa,quantidade))
+    cur = conn.cursor()
+    cur.execute("""
+        INSERT INTO lavagens (data, tipo_veiculo, servico, valor, cliente, placa, quantidade, desconto, valor_com_desconto)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """, (data, tipo_veiculo, servico, valor, cliente, placa, quantidade, desconto, valor_com_desconto))
     conn.commit()
     conn.close()
 
@@ -641,22 +651,42 @@ with tab_registrar:
         valor_base = get_preco(tipo_veiculo, servico)
         quantidade = st.number_input("Quantidade", min_value=1, value=1, step=1, key="qtd")
         valor_total = valor_base * quantidade
+        st.markdown("---")
+        st.markdown("##### 💰 Desconto (R$)")
+        col_desc1, col_desc2 = st.columns([1, 1])
+        with col_desc1:
+            desconto_valor = st.number_input("Valor do Desconto (R$)", min_value=0.0, max_value=float(valor_total), value=0.0, step=5.0, key="desc_valor")
+        with col_desc2:
+            valor_final = valor_total - desconto_valor
+            st.markdown(f"""
+            <div style="background:#1e293b;padding:0.8rem;border-radius:10px;border:1px solid #334155;">
+                <p style="margin:0;color:#94a3b8;font-size:0.75rem;">Valor Final</p>
+                <p style="margin:0;font-size:1.5rem;font-weight:800;color:{"#10b981" if desconto_valor > 0 else "#3b82f6"};">R$ {valor_final:.2f}</p>
+                {f'<p style="margin:0;color:#ef4444;font-size:0.75rem;">Desconto: R$ {desconto_valor:.2f}</p>' if desconto_valor > 0 else ''}
+            </div>
+            """, unsafe_allow_html=True)
         st.markdown(f"""<div style="background:#f3f4f6;border-radius:12px;padding:1rem;margin-bottom:1rem;"><p style="margin:0;color:#6b7280;font-size:0.85rem;">Valor Unitário</p><p style="margin:0;font-size:1.5rem;font-weight:800;color:#111827;">R$ {float(valor_base):.2f}</p><p style="margin:0;color:#6b7280;font-size:0.85rem;margin-top:0.5rem;">Valor Total ({quantidade}x)</p><p style="margin:0;font-size:1.8rem;font-weight:800;color:#1e3a5f;">R$ {float(valor_total):.2f}</p></div>""", unsafe_allow_html=True)
         cliente = st.text_input("Nome do Cliente", key="cl", placeholder="Nome (ou deixe vazio)")
         placa = st.text_input("Placa", key="pl", placeholder="Placa").upper()
+        data_lavagem = st.date_input("Data da Lavagem", value=date.today(), key="dl")
         if st.button("💾 Registrar Lavagem", type="primary", use_container_width=True):
-            nome_cliente = cliente.strip().upper() if cliente.strip() else f"{tipo_veiculo} #1"
-            agora = datetime.now()
-            registrar_lavagem(agora, tipo_veiculo, servico, valor_total, nome_cliente, placa.strip().upper(), quantidade)
-            st.success(f"✅ Lavagem registrada: {nome_cliente} - {servico} - R$ {float(valor_total):.2f}")
-            st.rerun()
+                nome_cliente = cliente.strip().upper() if cliente.strip() else f"{tipo_veiculo} #1"
+                # Usa a data escolhida + horário atual
+                agora = datetime.now()
+                data_completa = datetime(
+                    data_lavagem.year, data_lavagem.month, data_lavagem.day,
+                    agora.hour, agora.minute, agora.second
+                )
+                registrar_lavagem(data_completa, tipo_veiculo, servico, valor_total, nome_cliente, placa.strip().upper(), quantidade, desconto_valor, valor_final)
+                st.success(f"✅ Lavagem registrada: {nome_cliente} - {servico} - R$ {float(valor_total):.2f}")
+                st.rerun()
     with col_history:
         st.markdown("#### 📋 Últimas Lavagens")
         df_lav = carregar_lavagens()
         if not df_lav.empty:
             if 'data_formatada' in df_lav.columns:
                 df_lav['data'] = df_lav['data_formatada']
-            cols = [c for c in ['data','cliente','tipo_veiculo','servico','quantidade','valor','placa'] if c in df_lav.columns]
+            cols = [c for c in ['data','cliente','tipo_veiculo','servico','quantidade','valor','desconto','valor_com_desconto','placa'] if c in df_lav.columns]
             st.dataframe(df_lav[cols].head(20), use_container_width=True, hide_index=True)
             total = len(df_lav)
             qtd_total = int(df_lav['quantidade'].sum()) if 'quantidade' in df_lav.columns and not df_lav['quantidade'].isna().all() else total
