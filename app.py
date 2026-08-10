@@ -770,20 +770,24 @@ with tab_mensalistas:
                     st.rerun()
 
             if st.session_state.get(f'ed_{idx}', False):
-                # CORREÇÃO: trata data_inicio que pode vir como None, False, string ou date
+                # ===== CORREÇÃO À PROVA DE BALA DA DATA =====
                 raw_data = row['data_inicio']
-                if raw_data is None or raw_data is False or raw_data == '':
-                    data_edit = date.today()
-                elif isinstance(raw_data, str):
-                    try:
-                        data_edit = datetime.strptime(raw_data, "%Y-%m-%d").date()
-                    except:
+                try:
+                    if raw_data is None or isinstance(raw_data, bool) or raw_data == '' or raw_data == 0:
                         data_edit = date.today()
-                elif hasattr(raw_data, 'date'):
-                    data_edit = raw_data.date()
-                elif isinstance(raw_data, date):
-                    data_edit = raw_data
-                else:
+                    elif isinstance(raw_data, str):
+                        try:
+                            data_edit = datetime.strptime(raw_data.strip(), "%Y-%m-%d").date()
+                        except:
+                            try:
+                                data_edit = datetime.strptime(raw_data.strip(), "%d/%m/%Y").date()
+                            except:
+                                data_edit = date.today()
+                    elif hasattr(raw_data, 'date'):
+                        data_edit = raw_data.date()
+                    else:
+                        data_edit = date.today()
+                except Exception:
                     data_edit = date.today()
 
                 with st.form(f"ef_{idx}"):
@@ -800,14 +804,16 @@ with tab_mensalistas:
                     ed = st.date_input("Data", value=data_edit, key=f"ed_{idx}")
                     ea = st.checkbox("Ativo", value=bool(row['ativo']), key=f"ea_{idx}")
 
-                    col_salva, col_cancela = st.columns([1, 1])
-                    with col_salva:
-                        if st.form_submit_button("💾 Salvar", type="primary", use_container_width=True):
+                    # ===== BOTÕES SALVAR + CANCELAR =====
+                    col_salvar, col_cancelar = st.columns(2)
+                    with col_salvar:
+                        if st.form_submit_button("💾 Salvar Alterações", type="primary", use_container_width=True):
                             atualizar_mensalista(row['id'], en, et, etp, ep, epl, ev, ed.strftime("%Y-%m-%d"), 1 if ea else 0)
                             st.session_state[f'ed_{idx}'] = False
+                            st.success("✅ Mensalista atualizado!")
                             st.rerun()
-                    with col_cancela:
-                        if st.form_submit_button("Cancelar", use_container_width=True):
+                    with col_cancelar:
+                        if st.form_submit_button("❌ Cancelar", use_container_width=True):
                             st.session_state[f'ed_{idx}'] = False
                             st.rerun()
 
