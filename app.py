@@ -930,16 +930,17 @@ with tab_analises:
             df_lav['mes_ano'] = df_lav['data'].dt.strftime('%Y-%m')
             df_lav['dia_semana'] = df_lav['data'].dt.dayofweek
             anos_disp = sorted(df_lav['ano'].unique(), reverse=True)
-            meses_disp = sorted(int(m) for m in df_lav['mes'].unique() if pd.notna(m))
             flt1, flt2, flt3 = st.columns(3)
             with flt1:
                 ano_sel = st.selectbox("Ano", anos_disp, key="as")
             with flt2:
-                if meses_disp:
-                    mes_sel = st.selectbox("Mês", [f"{int(m):02d}" for m in meses_disp], key="ms")
-                else:
-                    mes_sel = None
-                    st.selectbox("Mês", ["—"], key="ms")
+                # Mostra todos os 12 meses do ano selecionado (julho sempre acessível)
+                mes_sel = st.selectbox(
+                    "Mês",
+                    [f"{m:02d}" for m in range(1, 13)],
+                    key="ms",
+                    format_func=lambda x: ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"][int(x)-1]
+                )
             with flt3:
                 servs = sorted(df_lav['servico'].unique())
                 serv_sel = st.selectbox("Serviço", ["Todos"] + servs, key="ss")
@@ -1088,8 +1089,6 @@ with tab_analises:
 
                 # Gera lista de meses a partir do mês inicial
                 meses_lista = set()
-                hoje = datetime.now()
-                mes_atual = hoje.strftime('%Y-%m')
 
                 # Meses com lavagens
                 if not df_lav.empty and 'data_raw' in df_lav.columns:
@@ -1111,9 +1110,6 @@ with tab_analises:
                 except:
                     pass
 
-                # Mês atual (só se for >= mês inicial)
-                if mes_atual >= mes_inicial_str:
-                    meses_lista.add(mes_atual)
 
                 if meses_lista:
                     meses_ordenados = sorted(meses_lista)
