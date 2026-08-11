@@ -694,7 +694,7 @@ with tab_registrar:
         df_lav = carregar_lavagens()
         if not df_lav.empty:
             if 'data_formatada' in df_lav.columns:
-            df_lav['data'] = pd.to_datetime(df_lav['data'])
+                df_lav['data'] = pd.to_datetime(df_lav['data'])
             cols = [c for c in ['data','cliente','tipo_veiculo','servico','quantidade','valor','desconto','valor_com_desconto','placa'] if c in df_lav.columns]
             st.dataframe(df_lav[cols].head(20), use_container_width=True, hide_index=True)
             total = len(df_lav)
@@ -912,14 +912,11 @@ with tab_analises:
     receita_lav = 0
     ticket_medio = 0
     receita_bruta = 0
-
-    # Soma receita dos mensalistas ativos (SEMPRE, independente de lavagens)
     receita_mensalistas = 0
     if not df_mens.empty:
         mens_ativos_mask = df_mens['ativo'] == 1
         if mens_ativos_mask.any():
             receita_mensalistas = pd.to_numeric(df_mens.loc[mens_ativos_mask, 'valor_plano'], errors='coerce').sum()
-
     if not df_lav.empty:
         df_lav['data_raw'] = pd.to_datetime(df_lav['data_formatada'] if 'data_formatada' in df_lav.columns else df_lav['data'], errors='coerce')
         df_lav = df_lav.dropna(subset=['data_raw']).reset_index(drop=True)
@@ -954,7 +951,6 @@ with tab_analises:
             total_lav = qtd_total_lav
             receita_lav = float(df_filtro['valor'].sum()) if not df_filtro.empty else 0
             ticket_medio = receita_lav / qtd_total_lav if qtd_total_lav > 0 else 0
-
             receita_bruta = receita_lav + receita_mensalistas
         else:
             st.info("Nenhuma lavagem com data válida.")
