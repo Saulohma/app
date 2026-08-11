@@ -918,7 +918,10 @@ with tab_analises:
         if mens_ativos_mask.any():
             receita_mensalistas = pd.to_numeric(df_mens.loc[mens_ativos_mask, 'valor_plano'], errors='coerce').sum()
     if not df_lav.empty:
-        df_lav['data_raw'] = pd.to_datetime(df_lav['data_formatada'] if 'data_formatada' in df_lav.columns else df_lav['data'], errors='coerce')
+        if 'data' in df_lav.columns:
+            df_lav['data_raw'] = pd.to_datetime(df_lav['data'], errors='coerce')
+        else:
+            df_lav['data_raw'] = pd.to_datetime(df_lav['data_formatada'], format='%d/%m/%Y', errors='coerce')
         df_lav = df_lav.dropna(subset=['data_raw']).reset_index(drop=True)
         if not df_lav.empty:
             df_lav['data'] = df_lav['data_raw']
