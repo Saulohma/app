@@ -98,19 +98,27 @@ def init_db():
     conn = get_conn()
     with conn.cursor() as cur:
         cur.execute("""
-    CREATE TABLE IF NOT EXISTS lavagens (
-        id SERIAL PRIMARY KEY,
-        data TIMESTAMP,
-        tipo_veiculo TEXT,
-        servico TEXT,
-        valor REAL,
-        cliente TEXT,
-        placa TEXT,
-        quantidade INTEGER DEFAULT 1,
-        desconto REAL DEFAULT 0,
-        valor_com_desconto REAL DEFAULT 0
-        )
-    """)
+            CREATE TABLE IF NOT EXISTS lavagens (
+                id SERIAL PRIMARY KEY,
+                data TIMESTAMP,
+                tipo_veiculo TEXT,
+                servico TEXT,
+                valor REAL,
+                cliente TEXT,
+                placa TEXT,
+                quantidade INTEGER DEFAULT 1,
+                desconto REAL DEFAULT 0,
+                valor_com_desconto REAL DEFAULT 0
+            )
+        """)
+
+        # ===== FIX: Adiciona colunas de desconto na tabela lavagens EXISTENTE =====
+        try:
+            cur.execute("ALTER TABLE lavagens ADD COLUMN IF NOT EXISTS desconto REAL DEFAULT 0")
+            cur.execute("ALTER TABLE lavagens ADD COLUMN IF NOT EXISTS valor_com_desconto REAL DEFAULT 0")
+        except Exception:
+            pass
+
         cur.execute("""
             CREATE TABLE IF NOT EXISTS mensalistas (
                 id SERIAL PRIMARY KEY, nome TEXT, telefone TEXT,
