@@ -694,7 +694,7 @@ with tab_registrar:
         df_lav = carregar_lavagens()
         if not df_lav.empty:
             if 'data_formatada' in df_lav.columns:
-                df_lav['data'] = df_lav['data_formatada']
+            df_lav['data'] = pd.to_datetime(df_lav['data'])
             cols = [c for c in ['data','cliente','tipo_veiculo','servico','quantidade','valor','desconto','valor_com_desconto','placa'] if c in df_lav.columns]
             st.dataframe(df_lav[cols].head(20), use_container_width=True, hide_index=True)
             total = len(df_lav)
@@ -934,13 +934,13 @@ with tab_analises:
             with flt1:
                 ano_sel = st.selectbox("Ano", anos_disp, key="as")
             with flt2:
-                # Mostra todos os 12 meses do ano selecionado (julho sempre acessível)
-                mes_sel = st.selectbox(
-                    "Mês",
-                    [f"{m:02d}" for m in range(1, 13)],
-                    key="ms",
-                    format_func=lambda x: ["Jan","Fev","Mar","Abr","Mai","Jun","Jul","Ago","Set","Out","Nov","Dez"][int(x)-1]
-                )
+                # SÓ mostra meses que têm lavagens no ano selecionado
+                meses_disp = sorted(int(m) for m in df_lav[df_lav['ano'] == ano_sel]['mes'].unique() if pd.notna(m))
+                if meses_disp:
+                    mes_sel = st.selectbox("Mês", [f"{int(m):02d}" for m in meses_disp], key="ms")
+                else:
+                    mes_sel = None
+                    st.selectbox("Mês", ["—"], key="ms")
             with flt3:
                 servs = sorted(df_lav['servico'].unique())
                 serv_sel = st.selectbox("Serviço", ["Todos"] + servs, key="ss")
